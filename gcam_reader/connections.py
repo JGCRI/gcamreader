@@ -14,13 +14,12 @@ else:
 import os.path as path
 import re
 import subprocess as sp
-#import shlex
 import pandas as pd
 from pandas.errors import EmptyDataError
 
 ### Default class path for the GCAM model interface
-##default_miclasspath = path.abspath(path.join(path.dirname(__file__), 'mifiles'))
-default_miclasspath = "/Library/Frameworks/R.framework/Versions/3.3/Resources/library/rgcam/ModelInterface/jars/*:/Library/Frameworks/R.framework/Versions/3.3/Resources/library/rgcam/ModelInterface/ModelInterface.jar"
+mifiles_dir = path.abspath(path.join(path.dirname(__file__), 'ModelInterface'))
+default_miclasspath = "{}/jars/*:{}/ModelInterface.jar".format(mifiles_dir, mifiles_dir)
 
 
 ### Local DB connection
