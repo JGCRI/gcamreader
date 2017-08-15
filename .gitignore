@@ -98,5 +98,8 @@ ENV/
 # mypy
 .mypy_cache/
 
-# emacs files
+# emacs backup files
 *~
+
+# directory with test data for development
+testdata/
