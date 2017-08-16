@@ -5,8 +5,6 @@
 
 import sys
 if sys.version_info[0] < 3:
-    ## Not 100% sure we plan to support python2, but we might as well
-    ## keep the option open.
     from StringIO import StringIO
 else:
     from io import StringIO
@@ -15,6 +13,10 @@ import os.path as path
 import re
 import subprocess as sp
 import pandas as pd
+
+### sibling modules in this package
+import query
+
 
 ### Default class path for the GCAM model interface
 mifiles_dir = path.abspath(path.join(path.dirname(__file__), 'ModelInterface'))
@@ -31,14 +33,14 @@ def _querylist(items):
         return("('" + "','".join(items) + "')")
 
 
-def _parserslt(txt, warn_empty, query, stderr=""):
+def _parserslt(txt, warn_empty, title, stderr=""):
     from pandas.errors import EmptyDataError
     ## Parse the string returned by a model interface into a pandas
     ## data frame.
     ## Arguments: 
     ##     txt: the text returned by the query
     ##     warn_empty: flag for issuing warnings on empty results
-    ##     query: original query string (used in warning messages)
+    ##     title: query title (used in warning messages)
     ##     stderr: std error output from model interface (used in messages)
     buf = StringIO(txt)
 
@@ -62,7 +64,6 @@ class LocalDBConn:
     database, along with a class path for the java program used to
     extract data and some options to be passed to the functions that
     run the queries.
-
     """
 
     def __init__(self, dbpath, dbfile, suppress_gabble=True, miclasspath = None):
@@ -88,10 +89,31 @@ class LocalDBConn:
 
 
     def runQuery(self, query, scenarios = None, regions = None, warn_empty = True):
+        """Run a query on this connection
+        
+        Run the supplied query and return the result a a Pandas data
+        frame.  This query will generally have been parsed from a GCAM
+        queries.xml file.  The query can contain a list of regions
+        parsed from the XML file. If present, query results will be
+        filtered to this list of regions; otherwise, all regions will
+        be included.  The regions argument, if present, will override
+        the region filters parsed from the XML.  Passing an empty list
+        in this argument will remove the region filter entirely.
 
+        Arguments: 
+          * query: a Query object.
+          * scenarios: A list of scenarios to include in query results.  If None,
+            then use the last scenario in the database.
+          * regions: A list of regions to filter query results to. See description
+            for what happens if regions is None
+          * warn_empty: issue a warning to stderr if the query result is empty.
+
+        """
         ## convert region and scenario lists to strings.  The format is
         ## ('item1', 'item2', ..., 'itemN')
         xqscen = _querylist(scenarios)
+        if regions is None:
+            regions = query.regions
         xqrgn = _querylist(regions)
 
         ## convert suppress_gabble flag to a string.  I believe the model
@@ -100,9 +122,9 @@ class LocalDBConn:
             sg = "TRUE"
         else:
             sg = "FALSE"
-            
+
         ## strip newlines from query string
-        query = re.sub("\n", "", query)
+        querystr = re.sub("\n", "", query.querystr)
 
         cmd =  [
             "java",
@@ -114,7 +136,7 @@ class LocalDBConn:
             "-smethod=csv",
             "-scsv=header=yes",
             "-i", self.dbfile,
-            "import module namespace mi = 'ModelInterface.ModelGUI2.xmldb.RunMIQuery';" + "mi:runMIQuery(" + query + "," + xqscen + "," + xqrgn + ")",
+            "import module namespace mi = 'ModelInterface.ModelGUI2.xmldb.RunMIQuery';" + "mi:runMIQuery(" + querystr + "," + xqscen + "," + xqrgn + ")",
         ]
 
         try:
@@ -122,11 +144,11 @@ class LocalDBConn:
         except CalledProcessError(e):
             sys.stderr.write("Model interface run failed.\n")
             sys.stderr.write("Command line: \n\t{}\n".format(' '.join(cmd)))
-            sys.stderr.write("Query string: \n\t{}\n".format(query))
+            sys.stderr.write("Query string: \n\t{}\n".format(query.querystr))
             sys.stderr.write("Model interface stderr output:\n\t{}\n".format(e.stderr))
             raise
 
-        return _parserslt(mireturn.stdout, warn_empty, query, mireturn.stderr)
+        return _parserslt(mireturn.stdout, warn_empty, query.title, mireturn.stderr)
         
 
 ### Remote connection
@@ -165,14 +187,36 @@ class RemoteDBConn:
 
 
     def runQuery(self, query, scenarios = None, regions = None, warn_empty = True):
+        """Run a query on this connection
+        
+        Run the supplied query and return the result a a Pandas data
+        frame.  This query will generally have been parsed from a GCAM
+        queries.xml file.  The query can contain a list of regions
+        parsed from the XML file. If present, query results will be
+        filtered to this list of regions; otherwise, all regions will
+        be included.  The regions argument, if present, will override
+        the region filters parsed from the XML.  Passing an empty list
+        in this argument will remove the region filter entirely.
+
+        Arguments: 
+          * query: a Query object.
+          * scenarios: A list of scenarios to include in query results.  If None,
+            then use the last scenario in the database.
+          * regions: A list of regions to filter query results to. See description
+            for what happens if regions is None
+          * warn_empty: issue a warning to stderr if the query result is empty.
+
+        """
         from requests import post
         
         xqscen = _querylist(scenarios)
+        if regions is None:
+            regions = query.regions
         xqrgn = _querylist(regions)
 
         javastr = "".join([
             "import module namespace mi = 'ModelInterface.ModelGUI2.xmldb.RunMIQuery';",
-            "mi:runMIQuery({}, {}, {})".format(query, xqscen, xqrgn)
+            "mi:runMIQuery({}, {}, {})".format(query.querystr, xqscen, xqrgn)
         ])
         
         restquery = " ".join([
@@ -199,5 +243,5 @@ class RemoteDBConn:
         r = post(url, auth=(self.username, self.password), data=restquery)
         r.raise_for_status()    # falls through if status is OK.
 
-        return _parserslt(r.text, warn_empty, query)
+        return _parserslt(r.text, warn_empty, query.title)
 
