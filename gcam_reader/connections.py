@@ -19,8 +19,8 @@ import query
 
 
 ### Default class path for the GCAM model interface
-mifiles_dir = path.abspath(path.join(path.dirname(__file__), 'ModelInterface'))
-default_miclasspath = "{}/jars/*:{}/ModelInterface.jar".format(mifiles_dir, mifiles_dir)
+_mifiles_dir = path.abspath(path.join(path.dirname(__file__), 'ModelInterface'))
+_default_miclasspath = "{}/jars/*:{}/ModelInterface.jar".format(_mifiles_dir, _mifiles_dir)
 
 
 ### Helper functions for formatting and parsing queries
@@ -87,7 +87,7 @@ class LocalDBConn:
         self.suppress_gabble = suppress_gabble
 
         if miclasspath is None:
-            self.miclasspath = default_miclasspath
+            self.miclasspath = _default_miclasspath
         else:
             self.miclasspath = path.abspath(miclasspath)
 

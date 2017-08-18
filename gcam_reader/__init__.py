@@ -2,5 +2,8 @@
 Tools for handling GCAM output databases
 """
 
-__all__ = ['connections']
+from query import *
+from connections import *
+
+__all__ = ['connections', 'query']
 
