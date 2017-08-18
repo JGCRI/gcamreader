@@ -16,7 +16,7 @@ class Query:
           * title: query title
         """
 
-        if xmlin.__class__ == str:
+        if xmlin.__class__ is str:
             xmlq = ET.fromstring(xmlin)
         else:
             xmlq = xmlin
@@ -63,14 +63,14 @@ def importdata(dbspec, queries, scenarios=None, regions=None, warn_empty=False,
           Default is false.
     """
 
-    if dbspec.__class__ == str:
+    if dbspec.__class__ is str:
         dbdir = os.path.dirname(dbspec)
         dbname = os.path.dirname(dbspec)
         dbcon = LocalDBConn(dbdir, dbname, suppress_gabble, miclasspath)
     else:
         dbcon = dbspec
 
-    if queries.__class__ == str:
+    if queries.__class__ is str:
         queries = parse_batch_query(queries)
 
     queryrslts = {} 

@@ -30,6 +30,10 @@ def _querylist(items):
     if items is None or len(items) == 0:
         return("()")
     else:
+        if items.__class__ is str:
+            ## items was supposed to be a list, so convert a string
+            ## into a single-element list.
+            items = [items]
         return("('" + "','".join(items) + "')")
 
 
