@@ -1,7 +1,4 @@
-"""Classes for representing GCAM database connections. 
-   Required methods for these classes:
-      * runQuery
-"""
+"""Functions and classes for running GCAM output DB queries"""
 
 import sys
 if sys.version_info[0] < 3:
@@ -13,9 +10,51 @@ import os.path as path
 import re
 import subprocess as sp
 import pandas as pd
+import xml.etree.ElementTree as ET
 
-### sibling modules in this package
-import query
+### Structure to hold a query (i.e., the stuff we send to the model
+### interface)
+
+class Query:
+    def __init__(self, xmlin):
+        """Initialize a query structure from an XML definition.
+        Arguments:
+          * xmlq: XML query definition. Can be either a string or a parsed XML
+            element.
+
+        Attributes:
+          * querystr: string representation of the query
+          * regions: region list parsed from the query XML
+          * title: query title
+        """
+
+        if xmlin.__class__ is str:
+            xmlq = ET.fromstring(xmlin)
+        else:
+            xmlq = xmlin
+
+        query = xmlq.find('./*[@title]')
+        self.querystr = ET.tostring(query, encoding='unicode')
+
+        regions = xmlq.findall('region')
+        if len(regions) == 0:
+            self.regions = None
+        else:
+            self.regions = [e.get('name') for e in regions]
+
+        self.title = query.get('title')
+
+
+def parse_batch_query(filename):
+    """Parse a GCAM query file into a list of Query class objects."""
+
+    tree = ET.parse(filename)
+    root = tree.getroot()
+
+    queries = root.findall('aQuery')
+
+    return [Query(q) for q in queries]
+
 
 
 ### Default class path for the GCAM model interface
@@ -59,6 +98,11 @@ def _parserslt(txt, warn_empty, title, stderr=""):
     else:
         return rslt
 
+#### Database connection classes
+
+#### There are currently two variants: local and remote connections.
+#### The public interface comprises (for now) a single method:
+#### runQuery()
     
 ### Local DB connection
 class LocalDBConn:
@@ -249,3 +293,42 @@ class RemoteDBConn:
 
         return _parserslt(r.text, warn_empty, query.title)
 
+
+
+def importdata(dbspec, queries, scenarios=None, regions=None, warn_empty=False,
+               suppress_gabble=True, miclasspath=None):
+    """Run a selection of queries against a database connection
+
+    Run all of the queries in a GCAM queries file against a database
+    connection and return a dictionary of query structures indeed by
+    query title.
+
+    Arguments:
+      * dbspec: a database connection, or a string with the filename 
+          for a GCAM database
+      * queries: filename of a GCAM queries XML file, or the output 
+          of parse_batch_query run on such a file.
+      * scenarios: list of scenario names to include in the queries
+      * regions: list of regions to include in the queries
+      * warn_empty: Flag: print a warning if a query returns empty. 
+          Default is false.
+    """
+
+    if dbspec.__class__ is str:
+        dbdir = path.dirname(dbspec)
+        dbname = path.basename(dbspec)
+        dbcon = LocalDBConn(dbdir, dbname, suppress_gabble, miclasspath)
+    else:
+        dbcon = dbspec
+
+    if queries.__class__ is str:
+        queries = parse_batch_query(queries)
+
+    queryrslts = {} 
+    for query in queries:
+        qr = dbcon.runQuery(query, scenarios, regions, warn_empty)
+        queryrslts[query.title] = qr
+
+    return queryrslts
+
+        

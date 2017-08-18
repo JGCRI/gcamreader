@@ -2,8 +2,7 @@
 Tools for handling GCAM output databases
 """
 
-from query import *
-from connections import *
+from querymi import *
 
-__all__ = ['connections', 'query']
+__all__ = ['querymi']
 
