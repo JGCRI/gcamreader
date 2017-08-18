@@ -145,7 +145,7 @@ class LocalDBConn:
 
         try:
             mireturn = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE, check = True, encoding="UTF-8") 
-        except CalledProcessError(e):
+        except sp.CalledProcessError as e:
             sys.stderr.write("Model interface run failed.\n")
             sys.stderr.write("Command line: \n\t{}\n".format(' '.join(cmd)))
             sys.stderr.write("Query string: \n\t{}\n".format(query.querystr))

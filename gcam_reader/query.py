@@ -3,6 +3,8 @@
 import xml.etree.ElementTree as ET
 import os.path
 
+### sibling modules from this package
+
 class Query:
     def __init__(self, xmlin):
         """Initialize a query structure from an XML definition.
@@ -64,9 +66,10 @@ def importdata(dbspec, queries, scenarios=None, regions=None, warn_empty=False,
     """
 
     if dbspec.__class__ is str:
+        import connections
         dbdir = os.path.dirname(dbspec)
-        dbname = os.path.dirname(dbspec)
-        dbcon = LocalDBConn(dbdir, dbname, suppress_gabble, miclasspath)
+        dbname = os.path.basename(dbspec)
+        dbcon = connections.LocalDBConn(dbdir, dbname, suppress_gabble, miclasspath)
     else:
         dbcon = dbspec
 
