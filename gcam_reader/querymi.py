@@ -34,7 +34,10 @@ class Query:
             xmlq = xmlin
 
         query = xmlq.find('./*[@title]')
-        self.querystr = ET.tostring(query, encoding='unicode')
+        if sys.version_info[0] < 3:
+            self.querystr = ET.tostring(query)
+        else:
+            self.querystr = ET.tostring(query, encoding='unicode')
 
         regions = xmlq.findall('region')
         if len(regions) == 0:
@@ -98,6 +101,45 @@ def _parserslt(txt, warn_empty, title, stderr=""):
     else:
         return rslt
 
+def _runmi(cmd, querystr):
+    v3_5 = 0x03050000
+    try:
+        if sys.hexversion >= v3_5:
+            ## python 3.5 or greater has the new interface
+            mireturn = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE,
+                              check = True, encoding="UTF-8")
+            miout = mireturn.stdout
+            mierr = mireturn.stderr
+        else:
+            ## Annoyingly, sp.check_output isn't safe to use with
+            ## pipes for stdout and stderr, and there is no way to get
+            ## popen to check return codes and raise a
+            ## CalledProcessError if appropriate.  So, we have to
+            ## emulate this behavior ourselves.
+            if sys.version_info[0] < 3:
+                ## Python 2 doesn't have the encoding parameter
+                miproc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
+            else:
+                miproc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE,
+                                  encoding="UTF-8")
+            miout, mierr = miproc.communicate()
+            if miproc.returncode != 0:
+                raise sp.CalledProcessError(returncode=1, cmd=cmd, output=mierr)
+
+        return (miout, mierr)
+    
+    except sp.CalledProcessError as e:
+        sys.stderr.write("Model interface run failed.\n")
+        sys.stderr.write("Command line: \n\t{}\n".format(' '.join(cmd)))
+        sys.stderr.write("Query string: \n\t{}\n".format(querystr))
+        sys.stderr.write("Model interface stderr output:\n")
+        if sys.hexversion >= v3_5:
+            sys.stderr.write(e.stderr)
+        else:
+            sys.stderr.write(e.output)
+        raise
+    
+            
 #### Database connection classes
 
 #### There are currently two variants: local and remote connections.
@@ -187,16 +229,9 @@ class LocalDBConn:
             "import module namespace mi = 'ModelInterface.ModelGUI2.xmldb.RunMIQuery';" + "mi:runMIQuery(" + querystr + "," + xqscen + "," + xqrgn + ")",
         ]
 
-        try:
-            mireturn = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE, check = True, encoding="UTF-8") 
-        except sp.CalledProcessError as e:
-            sys.stderr.write("Model interface run failed.\n")
-            sys.stderr.write("Command line: \n\t{}\n".format(' '.join(cmd)))
-            sys.stderr.write("Query string: \n\t{}\n".format(query.querystr))
-            sys.stderr.write("Model interface stderr output:\n\t{}\n".format(e.stderr))
-            raise
+        miout, mierr = _runmi(cmd, query.querystr)
 
-        return _parserslt(mireturn.stdout, warn_empty, query.title, mireturn.stderr)
+        return _parserslt(miout, warn_empty, query.title, mierr)
         
 
 ### Remote connection
