@@ -1,0 +1,2 @@
+include gcam_reader/ModelInterface/*
+include gcam_reader/ModelInterface/jars/*
