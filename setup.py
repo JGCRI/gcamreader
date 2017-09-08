@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="gcam_reader",
-    version="0.1",
+    version="0.1.1",
     description="Tools for importing GCAM output data",
     url="https://github.com/JGCRI/gcam_reader",
     author="Robert Link",

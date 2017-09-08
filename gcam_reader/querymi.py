@@ -61,8 +61,15 @@ def parse_batch_query(filename):
 
 
 ### Default class path for the GCAM model interface
+### On unix this should produce something like:
+###    /foo/bar/baz/jars/*:/foo/bar/baz/ModelInterface.jar
 _mifiles_dir = path.abspath(path.join(path.dirname(__file__), 'ModelInterface'))
-_default_miclasspath = "{}/jars/*:{}/ModelInterface.jar".format(_mifiles_dir, _mifiles_dir)
+_default_miclasspath = (
+    "{dir}{dsep}jars{dsep}*{psep}{dir}{dsep}ModelInterface.jar".format(
+        dir=_mifiles_dir, 
+        dsep=path.sep,          # directory separator
+        psep=path.pathsep)      # path separator
+)
 
 
 ### Helper functions for formatting and parsing queries
