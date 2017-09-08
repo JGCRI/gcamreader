@@ -9,7 +9,8 @@ setup(
     author_email="robert.link@pnnl.gov",
     packages=["gcam_reader"],
     install_requires=[
-        "requests"
+        "requests>=2.18.4",
+        "pandas>=0.20",
     ],
     include_package_data=True,
     zip_safe=False
