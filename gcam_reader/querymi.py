@@ -12,8 +12,12 @@ import subprocess as sp
 import pandas as pd
 import xml.etree.ElementTree as ET
 
-### Structure to hold a query (i.e., the stuff we send to the model
-### interface)
+
+class VersionException(Exception):
+
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+
 
 class Query:
     def __init__(self, xmlin):
@@ -59,19 +63,6 @@ def parse_batch_query(filename):
     return [Query(q) for q in queries]
 
 
-
-### Default class path for the GCAM model interface
-### On unix this should produce something like:
-###    /foo/bar/baz/jars/*:/foo/bar/baz/ModelInterface.jar
-_mifiles_dir = path.abspath(path.join(path.dirname(__file__), 'ModelInterface'))
-_default_miclasspath = (
-    "{dir}{dsep}jars{dsep}*{psep}{dir}{dsep}ModelInterface.jar".format(
-        dir=_mifiles_dir, 
-        dsep=path.sep,          # directory separator
-        psep=path.pathsep)      # path separator
-)
-
-
 ### Helper functions for formatting and parsing queries
 def _querylist(items):
     ## convert region and scenario lists to strings.  The format is
@@ -107,6 +98,7 @@ def _parserslt(txt, warn_empty, title, stderr=""):
         return None
     else:
         return rslt
+
 
 def _runmi(cmd, querystr):
     v3_5 = 0x03050000
@@ -162,13 +154,16 @@ class LocalDBConn:
     extract data and some options to be passed to the functions that
     run the queries.
     """
+    _versions = ('8.5.3', '8.6.7')
+    _mifiles_dir = path.abspath(path.join(path.dirname(__file__), 'ModelInterface/versions'))
 
-    def __init__(self, dbpath, dbfile, suppress_gabble=True, miclasspath = None):
+    def __init__(self, dbpath, dbfile, version='8.5.3', suppress_gabble=True, miclasspath=None):
         """Initialize a local db connection.
 
         params:
           * dbpath:  directory containing the GCAM database
           * dbfile:  name of the GCAM database
+          * version: version number of the basex jar to use
           * suppress_gabble: Flag, if True, suppress the console output normally
                 produced by the model interface.  Otherwise, display the console
                 output.
@@ -178,12 +173,31 @@ class LocalDBConn:
         self.dbpath = path.abspath(dbpath)
         self.dbfile = dbfile
         self.suppress_gabble = suppress_gabble
+        self.version = version
 
         if miclasspath is None:
-            self.miclasspath = _default_miclasspath
+            self.miclasspath = self.basex_version() # _default_miclasspath
         else:
             self.miclasspath = path.abspath(miclasspath)
 
+    def basex_version(self):
+        """
+        Instantiate versions of the model interface and the accompanying BaseX jars.
+        """
+        if self.version not in LocalDBConn._versions:
+            raise VersionException(
+                'Version {} not available.  Choose from {}.'.format(self.version, LocalDBConn._versions))
+
+        vx = 'v{}'.format(self.version.replace('.', 'p'))
+
+        substring = (
+            "{dir}{dsep}{ver}{dsep}jars{dsep}*{psep}{dir}{dsep}{ver}{dsep}ModelInterface.jar".format(
+                dir=LocalDBConn._mifiles_dir,
+                dsep=path.sep,          # directory separator
+                psep=path.pathsep,      # path separator
+                ver=vx)                 # version dir
+        )
+        return substring
 
     def runQuery(self, query, scenarios = None, regions = None, warn_empty = True):
         """Run a query on this connection
