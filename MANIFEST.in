@@ -1,2 +1,4 @@
-include gcam_reader/ModelInterface/*
-include gcam_reader/ModelInterface/jars/*
+include gcam_reader/ModelInterface/versions/v8p5p3/*
+include gcam_reader/ModelInterface/versions/v8p5p3/jars/*
+include gcam_reader/ModelInterface/versions/v8p6p7/*
+include gcam_reader/ModelInterface/versions/v8p6p7/jars/*
