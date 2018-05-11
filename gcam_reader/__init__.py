@@ -2,7 +2,7 @@
 Tools for handling GCAM output databases
 """
 
-from querymi import *
+from gcam_reader.querymi import *
 
 __all__ = ['querymi']
 
