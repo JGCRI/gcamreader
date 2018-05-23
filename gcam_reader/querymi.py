@@ -10,7 +10,7 @@ import os.path as path
 import re
 import subprocess as sp
 import pandas as pd
-import xml.etree.ElementTree as ET
+import lxml.etree as ET
 
 ### Structure to hold a query (i.e., the stuff we send to the model
 ### interface)
@@ -29,15 +29,13 @@ class Query:
         """
 
         if xmlin.__class__ is str:
-            xmlq = ET.fromstring(xmlin)
+            parser = ET.XMLParser(strip_cdata=False)
+            xmlq = ET.XML(xmlin, parser)
         else:
             xmlq = xmlin
 
         query = xmlq.find('./*[@title]')
-        if sys.version_info[0] < 3:
-            self.querystr = ET.tostring(query)
-        else:
-            self.querystr = ET.tostring(query, encoding='unicode')
+        self.querystr = ET.tounicode(query)
 
         regions = xmlq.findall('region')
         if len(regions) == 0:
@@ -51,8 +49,8 @@ class Query:
 def parse_batch_query(filename):
     """Parse a GCAM query file into a list of Query class objects."""
 
-    tree = ET.parse(filename)
-    root = tree.getroot()
+    parser = ET.XMLParser(strip_cdata=False)
+    root = ET.parse(filename, parser)
 
     queries = root.findall('aQuery')
 
@@ -163,7 +161,7 @@ class LocalDBConn:
     run the queries.
     """
 
-    def __init__(self, dbpath, dbfile, suppress_gabble=True, miclasspath = None):
+    def __init__(self, dbpath, dbfile, suppress_gabble=True, miclasspath = None, validatedb=True):
         """Initialize a local db connection.
 
         params:
@@ -174,6 +172,8 @@ class LocalDBConn:
                 output.
           * miclasspath: Java class path for the GCAM model interface.  The default
                 value points to a copy that was installed with this package.
+          * validatedb: If True, check that a simple db query works on the
+                connection; otherwise, don't run the check.
         """
         self.dbpath = path.abspath(dbpath)
         self.dbfile = dbfile
@@ -183,6 +183,16 @@ class LocalDBConn:
             self.miclasspath = _default_miclasspath
         else:
             self.miclasspath = path.abspath(miclasspath)
+
+        if validatedb:
+            ## Print the scenarios in the database.  This will also allow us to check
+            ## whether the database is working
+            dbscen = self.listScenariosInDB()
+            if dbscen is None:
+                sys.stderr.write("Failed to validate database.\n")
+                raise Exception("Failed to validate database: "+self.dbpath+"/"+self.dbfile)
+            else:
+                sys.stdout.write("Database scenarios: {}\n".format(', '.join(dbscen['name'])))
 
 
     def runQuery(self, query, scenarios = None, regions = None, warn_empty = True):
@@ -214,11 +224,7 @@ class LocalDBConn:
         xqrgn = _querylist(regions)
 
         ## convert suppress_gabble flag to a string.  I believe the model
-        ## interface wants all caps, so we can't just use str()
-        if self.suppress_gabble:
-            sg = "TRUE"
-        else:
-            sg = "FALSE"
+        sg = str(self.suppress_gabble)
 
         ## strip newlines from query string
         querystr = re.sub("\n", "", query.querystr)
@@ -226,12 +232,12 @@ class LocalDBConn:
         cmd =  [
             "java",
             "-cp", self.miclasspath,
-            "-Xmx2g",               # TODO: add explicit memory size limits?
+            "-Xmx16g",               # TODO: add explicit memory size limits?
             "-Dorg.basex.DBPATH=" + self.dbpath,
             "-DModelInterface.SUPPRESS_OUTPUT=" + sg,
             "org.basex.BaseX",
             "-smethod=csv",
-            "-scsv=header=yes",
+            "-scsv=header=yes,format=xquery",
             "-i", self.dbfile,
             "import module namespace mi = 'ModelInterface.ModelGUI2.xmldb.RunMIQuery';" + "mi:runMIQuery(" + querystr + "," + xqscen + "," + xqrgn + ")",
         ]
@@ -239,6 +245,40 @@ class LocalDBConn:
         miout, mierr = _runmi(cmd, query.querystr)
 
         return _parserslt(miout, warn_empty, query.title, mierr)
+
+    def listScenariosInDB(self):
+        """Lists the Scenarios contained in a GCAM Database
+
+        To run a query users typically need to know the names of the scenarios in the
+        database.  If they are the ones to generate the data in the first place they
+        may already know this information.  Otherwise they could use this method to find
+        out.  The result of this call will be a table with columns name, date, and fqName
+        The name and date are exactly as specified in the datbase. The fqName is the fully
+        qualified scenario name which a user could use in the scenarios argument of runQuery
+        if they need to disambiguate scenario names.
+        """
+
+        querystr = "let $scns := collection()/scenario return document{ element csv { for $scn in $scns return element record { element name  { text { $scn/@name } }, element date { text { $scn/@date } } } } }"
+        cmd =  [
+            "java",
+            "-cp", self.miclasspath,
+            "-Xmx4g",               # TODO: add explicit memory size limits?
+            "-Dorg.basex.DBPATH=" + self.dbpath,
+            "org.basex.BaseX",
+            "-smethod=csv",
+            "-scsv=header=yes",
+            "-i", self.dbfile,
+            querystr
+        ]
+
+        miout, mierr = _runmi(cmd, querystr)
+
+        scen_df = _parserslt(miout, False, "List Scenarios", mierr)
+        if not scen_df is None:
+            scen_df['fqName'] = scen_df['name'] + " " + scen_df['date']
+
+        return scen_df
+
         
 
 ### Remote connection
@@ -257,7 +297,7 @@ class RemoteDBConn:
     supplemental documentation.
     """
 
-    def __init__(self, dbfile, username, password, address="localhost", port=8984):
+    def __init__(self, dbfile, username, password, address="localhost", port=8984, validatedb=True):
         """Initialize a remote database connection
 
         Arguments:
@@ -267,6 +307,8 @@ class RemoteDBConn:
         * password: The password configured for the BaseX server
         * address: The server address (URL).  The default is "localhost"
         * port: The port the server is running on.  The default is 8984.
+        * validatedb: If True, check that a simple db query works on the
+              connection; otherwise, don't run the check.
         """
 
         self.dbfile = dbfile
@@ -274,6 +316,16 @@ class RemoteDBConn:
         self.password = password
         self.address = address
         self.port = port
+
+        if validatedb:
+            ## Print the scenarios in the database.  This will also allow us to check
+            ## whether the database is working
+            dbscen = self.listScenariosInDB()
+            if dbscen is None:
+                sys.stderr.write("Failed to validate database.\n")
+                raise Exception("Failed to validate database: "+address+":"+port+" user= "+username+" file= "+dbfile)
+            else:
+                sys.stdout.write("Database scenarios: {}\n".format(', '.join(dbscen['name'])))
 
 
     def runQuery(self, query, scenarios = None, regions = None, warn_empty = True):
@@ -308,6 +360,8 @@ class RemoteDBConn:
             "import module namespace mi = 'ModelInterface.ModelGUI2.xmldb.RunMIQuery';",
             "mi:runMIQuery({}, {}, {})".format(query.querystr, xqscen, xqrgn)
         ])
+        # handle nested CDATA tags
+        javastr = javastr.replace("]]>", "]]]]><![CDATA[>")
         
         restquery = " ".join([
             '<rest:query xmlns:rest="http://basex.org/rest">',
@@ -316,7 +370,7 @@ class RemoteDBConn:
             ']]></rest:text>',
             '<rest:parameter name="method" value="csv"/>',
             '<rest:parameter name="media-type" value="text/csv"/>',
-            '<rest:parameter name="csv" value="header=yes"/>',
+            '<rest:parameter name="csv" value="header=yes,format=xquery"/>',
             '</rest:query>'
         ])
         
@@ -335,6 +389,48 @@ class RemoteDBConn:
 
         return _parserslt(r.text, warn_empty, query.title)
 
+    def listScenariosInDB(self):
+        """Lists the Scenarios contained in a GCAM Database
+
+        To run a query users typically need to know the names of the scenarios in the
+        database.  If they are the ones to generate the data in the first place they
+        may already know this information.  Otherwise they could use this method to find
+        out.  The result of this call will be a table with columns name, date, and fqName
+        The name and date are exactly as specified in the datbase. The fqName is the fully
+        qualified scenario name which a user could use in the scenarios argument of runQuery
+        if they need to disambiguate scenario names.
+        """
+        from requests import post
+
+        restquery = str.join("\n", [
+                '<rest:query xmlns:rest="http://basex.org/rest">',
+                '<rest:text><![CDATA[',
+                'let $scns := collection()/scenario return document{ element csv { for $scn in $scns return element record { element name  { text { $scn/@name } }, element date { text { $scn/@date } } } } }',
+                ']]></rest:text>',
+                '<rest:parameter name="method" value="csv"/>',
+                '<rest:parameter name="media-type" value="text/csv"/>',
+                '<rest:parameter name="csv" value="header=yes"/>',
+                '</rest:query>'
+                ])
+        
+        url = "".join([
+            "http://",
+            self.address,
+            ":",
+            str(self.port),
+            "/rest/",
+            self.dbfile
+        ])
+
+
+        r = post(url, auth=(self.username, self.password), data=restquery)
+        r.raise_for_status()    # falls through if status is OK.
+
+        scen_df = _parserslt(r.text, False, "List Scenarios")
+        if not scen_df is None:
+            scen_df['fqName'] = scen_df['name'] + " " + scen_df['date']
+
+        return scen_df
 
 
 def importdata(dbspec, queries, scenarios=None, regions=None, warn_empty=False,
