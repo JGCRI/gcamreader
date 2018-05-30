@@ -1,0 +1,3 @@
+[submodule "gcam_reader/ModelInterface/modelinterface"]
+	path = gcam_reader/ModelInterface/modelinterface
+	url = https://github.com/JGCRI/modelinterface.git
