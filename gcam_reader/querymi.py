@@ -189,8 +189,9 @@ class LocalDBConn:
             ## whether the database is working
             dbscen = self.listScenariosInDB()
             if dbscen is None:
-                sys.stderr.write("Failed to validate database.\n")
-                raise Exception("Failed to validate database: "+self.dbpath+"/"+self.dbfile)
+                errmsg = "Failed to validate database: " + os.path.join(self.dbpath, self.dbfile) 
+                sys.stderr.write(errmsg+"\n")
+                raise Exception(errmsg)
             else:
                 sys.stdout.write("Database scenarios: {}\n".format(', '.join(dbscen['name'])))
 
