@@ -257,7 +257,7 @@ class LocalDBConn:
         The name and date are exactly as specified in the datbase. The fqName is the fully
         qualified scenario name which a user could use in the scenarios argument of runQuery
         if they need to disambiguate scenario names. We also include the GCAM version tag that was
-        used to generate the scenario.
+        used to generate the scenario in the format: ver_<major>.<minor>_r<git describe value>
         """
 
         querystr = "let $scns := collection()/scenario return document{ element csv { for $scn in $scns return element record { element name  { text { $scn/@name } }, element date { text { $scn/@date } }, element version { text{ $scn/model-version/text() } } } } }"
@@ -401,7 +401,7 @@ class RemoteDBConn:
         The name and date are exactly as specified in the datbase. The fqName is the fully
         qualified scenario name which a user could use in the scenarios argument of runQuery
         if they need to disambiguate scenario names.  We also include the GCAM version tag that
-        was used to generate the scenario.
+        was used to generate the scenario in the format: ver_<major>.<minor>_r<git describe value>
         """
         from requests import post
 
