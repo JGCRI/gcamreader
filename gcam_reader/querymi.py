@@ -253,13 +253,14 @@ class LocalDBConn:
         To run a query users typically need to know the names of the scenarios in the
         database.  If they are the ones to generate the data in the first place they
         may already know this information.  Otherwise they could use this method to find
-        out.  The result of this call will be a table with columns name, date, and fqName
+        out.  The result of this call will be a table with columns name, date, version, and fqName
         The name and date are exactly as specified in the datbase. The fqName is the fully
         qualified scenario name which a user could use in the scenarios argument of runQuery
-        if they need to disambiguate scenario names.
+        if they need to disambiguate scenario names. We also include the GCAM version tag that was
+        used to generate the scenario.
         """
 
-        querystr = "let $scns := collection()/scenario return document{ element csv { for $scn in $scns return element record { element name  { text { $scn/@name } }, element date { text { $scn/@date } } } } }"
+        querystr = "let $scns := collection()/scenario return document{ element csv { for $scn in $scns return element record { element name  { text { $scn/@name } }, element date { text { $scn/@date } }, element version { text{ $scn/model-version/text() } } } } }"
         cmd =  [
             "java",
             "-cp", self.miclasspath,
@@ -396,17 +397,18 @@ class RemoteDBConn:
         To run a query users typically need to know the names of the scenarios in the
         database.  If they are the ones to generate the data in the first place they
         may already know this information.  Otherwise they could use this method to find
-        out.  The result of this call will be a table with columns name, date, and fqName
+        out.  The result of this call will be a table with columns name, date, version, and fqName
         The name and date are exactly as specified in the datbase. The fqName is the fully
         qualified scenario name which a user could use in the scenarios argument of runQuery
-        if they need to disambiguate scenario names.
+        if they need to disambiguate scenario names.  We also include the GCAM version tag that
+        was used to generate the scenario.
         """
         from requests import post
 
         restquery = str.join("\n", [
                 '<rest:query xmlns:rest="http://basex.org/rest">',
                 '<rest:text><![CDATA[',
-                'let $scns := collection()/scenario return document{ element csv { for $scn in $scns return element record { element name  { text { $scn/@name } }, element date { text { $scn/@date } } } } }',
+                'let $scns := collection()/scenario return document{ element csv { for $scn in $scns return element record { element name  { text { $scn/@name } }, element date { text { $scn/@date } }, element version { text{ $scn/model-version/text() } } } } }',
                 ']]></rest:text>',
                 '<rest:parameter name="method" value="csv"/>',
                 '<rest:parameter name="media-type" value="text/csv"/>',
