@@ -7,15 +7,10 @@ with open('requirements.txt') as f:
 
 # [0] major version, [1] minor, [2] mirco, [3] releaselevel, [4] serial
 reader_info = sys.version_info
-print(reader_info)
 
 # account for version dependency for subprocess
 if (reader_info[0] == 3) and (reader_info[1] >= 5):
     pass
-
-elif (reader_info[0] == 3) and (reader_info[1] < 5):
-    msg = """\nDEPRECIATION:  gcam_reader will soon only support >= Python 3.5. Please upgrade
-             your Python version.\n"""
 
 else:
     msg = """\nDEPRECATION: Your Python version {}.{} is depreciated due to Python 2.7 reaching the end of its life on 
