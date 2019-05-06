@@ -22,7 +22,7 @@ else:
 
 setup(
     name="gcam_reader",
-    version="0.5.0",
+    version="1.0.0",
     description="Tools for importing GCAM output data",
     url="https://github.com/JGCRI/gcam_reader",
     author="Robert Link",
