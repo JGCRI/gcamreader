@@ -1,6 +1,7 @@
 """Functions and classes for running GCAM output DB queries"""
 
 import sys
+import os
 if sys.version_info[0] < 3:
     from StringIO import StringIO
 else:
