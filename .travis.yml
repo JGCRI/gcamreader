@@ -10,7 +10,7 @@ matrix:
         - pip3 install -r requirements.txt
         - python setup.py -q install
       env: PATH=/c/Python36:/c/Python36/Scripts:$PATH
-      script: travis_wait 35 python3 -m unittest discover
+      script: travis_wait 35 python -m unittest discover
     - name: "Python 3.6.5 on macOS 10.13"
       os: osx
       osx_image: xcode9.4  # Python 3.6.5 running on macOS 10.13
