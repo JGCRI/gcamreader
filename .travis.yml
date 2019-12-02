@@ -6,9 +6,9 @@ matrix:
       before_install:
         - choco install python --version 3.6
         - python --version
-        - python3 -m pip3 install --upgrade pip
+        - python -m pip install --upgrade pip
         - pip3 install -r requirements.txt
-        - python3 setup.py -q install
+        - python setup.py -q install
       env: PATH=/c/Python36:/c/Python36/Scripts:$PATH
       script: travis_wait 35 python3 -m unittest discover
     - name: "Python 3.6.5 on macOS 10.13"
@@ -18,7 +18,7 @@ matrix:
       before_install:
         - python3 --version
         - pip3 install -U pip
-        - pip install -r requirements.txt
+        - pip3 install -r requirements.txt
         - python3 setup.py -q install
       script: travis_wait 35 python3 -m unittest discover
 sudo: false
