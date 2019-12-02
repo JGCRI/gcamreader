@@ -16,6 +16,7 @@ import lxml.etree as ET
 ### Structure to hold a query (i.e., the stuff we send to the model
 ### interface)
 
+
 class Query:
     def __init__(self, xmlin):
         """Initialize a query structure from an XML definition.
@@ -186,16 +187,16 @@ class LocalDBConn:
             self.miclasspath = path.abspath(miclasspath)
 
         if validatedb:
-            ## Print the scenarios in the database.  This will also allow us to check
-            ## whether the database is working
+            # Print the scenarios in the database.  This will also allow us to check whether the database is working
             dbscen = self.listScenariosInDB()
+
             if dbscen is None:
                 errmsg = "Failed to validate database: " + os.path.join(self.dbpath, self.dbfile) 
                 sys.stderr.write(errmsg+"\n")
-                raise Exception(errmsg)
+                raise IOError(errmsg)
+
             else:
                 sys.stdout.write("Database scenarios: {}\n".format(', '.join(dbscen['name'])))
-
 
     def runQuery(self, query, scenarios = None, regions = None, warn_empty = True):
         """Run a query on this connection
