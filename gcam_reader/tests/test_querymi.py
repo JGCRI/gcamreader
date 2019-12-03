@@ -38,7 +38,7 @@ class QueryTests(unittest.TestCase):
     @staticmethod
     def java_version():
         import subprocess
-        java_version = subprocess.call('java -version')
+        java_version = subprocess.call('java -version', shell=True)
         print(java_version)
 
     @classmethod
