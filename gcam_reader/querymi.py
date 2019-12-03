@@ -76,9 +76,6 @@ _default_miclasspath = (
         psep=path.pathsep)      # path separator
 )
 
-print(_default_miclasspath)
-
-
 
 ### Helper functions for formatting and parsing queries
 def _querylist(items):
@@ -118,6 +115,9 @@ def _parserslt(txt, warn_empty, title, stderr=""):
 
 
 def _runmi(cmd, querystr):
+
+    print(cmd)
+
     v3_5 = 0x03050000
     try:
         if sys.hexversion >= v3_5:
