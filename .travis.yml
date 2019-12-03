@@ -1,0 +1,42 @@
+matrix:
+  include:
+    - name: "Python 3.6 on Windows"
+      os: windows
+      language:  shell
+      before_install:
+        - git clone https://github.com/portapps/portapps ${TRAVIS_BUILD_DIR}/../portapps
+        - source ${TRAVIS_BUILD_DIR}/../portapps/.travis/prepare.sh
+        - bash ${TRAVIS_BUILD_DIR}/../portapps/.travis/java.sh
+        - set
+        - choco install python --version 3.6
+        - python --version
+        - python -m pip install --upgrade pip
+        - pip3 install -r requirements.txt
+        - python setup.py -q install
+      env: PATH=/c/Python36:/c/Python36/Scripts:$PATH
+      script: travis_wait 35 python -m unittest discover
+    - name: "Python 3.6.5 on macOS 10.13"
+      os: osx
+      osx_image: xcode9.4  # Python 3.6.5 running on macOS 10.13
+      language: shell  # 'language: python' is an error on Travis CI macOS
+      before_install:
+        - python3 --version
+        - pip3 install -U pip
+        - pip3 install -r requirements.txt
+        - python3 setup.py -q install
+      script: travis_wait 35 python3 -m unittest discover
+    - name: "Python 3.6 on Linux"
+      os: linux
+      dist: trusty
+      language: python
+      include:
+        - python: 3.6
+          dist: xenial
+      install:
+        - python --version
+        - pip install -U pip
+        - pip install -r requirements.txt
+        - python setup.py -q install
+      script: travis_wait 35 python3 -m unittest discover
+sudo: false
+cache: pip

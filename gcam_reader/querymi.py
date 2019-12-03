@@ -1,12 +1,16 @@
 """Functions and classes for running GCAM output DB queries"""
 
 import sys
+
 if sys.version_info[0] < 3:
     from StringIO import StringIO
 else:
     from io import StringIO
 
+import os
 import os.path as path
+import pkg_resources
+import tempfile
 import re
 import subprocess as sp
 import pandas as pd
@@ -14,6 +18,7 @@ import lxml.etree as ET
 
 ### Structure to hold a query (i.e., the stuff we send to the model
 ### interface)
+
 
 class Query:
     def __init__(self, xmlin):
@@ -61,7 +66,9 @@ def parse_batch_query(filename):
 ### Default class path for the GCAM model interface
 ### On unix this should produce something like:
 ###    /foo/bar/baz/jars/*:/foo/bar/baz/ModelInterface.jar
-_mifiles_dir = path.abspath(path.join(path.dirname(__file__), 'ModelInterface'))
+_mifiles_dir = pkg_resources.resource_filename('gcam_reader', 'ModelInterface')
+
+
 _default_miclasspath = (
     "{dir}{dsep}jars{dsep}*{psep}{dir}{dsep}ModelInterface.jar".format(
         dir=_mifiles_dir, 
@@ -106,23 +113,22 @@ def _parserslt(txt, warn_empty, title, stderr=""):
     else:
         return rslt
 
+
 def _runmi(cmd, querystr):
+
     v3_5 = 0x03050000
     try:
         if sys.hexversion >= v3_5:
-            ## python 3.5 or greater has the new interface
-            mireturn = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE,
-                              check = True, encoding="UTF-8")
+            # python 3.5 or greater has the new interface
+            mireturn = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE, check=True, encoding="UTF-8")
             miout = mireturn.stdout
             mierr = mireturn.stderr
         else:
-            ## Annoyingly, sp.check_output isn't safe to use with
-            ## pipes for stdout and stderr, and there is no way to get
-            ## popen to check return codes and raise a
-            ## CalledProcessError if appropriate.  So, we have to
-            ## emulate this behavior ourselves.
+            # Annoyingly, sp.check_output isn't safe to use with pipes for stdout and stderr, and there is no
+            # way to get popen to check return codes and raise a CalledProcessError if appropriate. So, we have to
+            # emulate this behavior ourselves.
             if sys.version_info[0] < 3:
-                ## Python 2 doesn't have the encoding parameter
+                # Python 2 doesn't have the encoding parameter
                 miproc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
             else:
                 miproc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE,
@@ -131,7 +137,7 @@ def _runmi(cmd, querystr):
             if miproc.returncode != 0:
                 raise sp.CalledProcessError(returncode=1, cmd=cmd, output=mierr)
 
-        return (miout, mierr)
+        return miout, mierr
     
     except sp.CalledProcessError as e:
         sys.stderr.write("Model interface run failed.\n")
@@ -144,14 +150,7 @@ def _runmi(cmd, querystr):
             sys.stderr.write(e.output)
         raise
     
-            
-#### Database connection classes
 
-#### There are currently two variants: local and remote connections.
-#### The public interface comprises (for now) a single method:
-#### runQuery()
-    
-### Local DB connection
 class LocalDBConn:
     """Connection to a local GCAM database
     
@@ -159,9 +158,10 @@ class LocalDBConn:
     database, along with a class path for the java program used to
     extract data and some options to be passed to the functions that
     run the queries.
+
     """
 
-    def __init__(self, dbpath, dbfile, suppress_gabble=True, miclasspath = None, validatedb=True):
+    def __init__(self, dbpath, dbfile, suppress_gabble=True, miclasspath = None, validatedb=True, maxMemory='4g'):
         """Initialize a local db connection.
 
         params:
@@ -174,10 +174,16 @@ class LocalDBConn:
                 value points to a copy that was installed with this package.
           * validatedb: If True, check that a simple db query works on the
                 connection; otherwise, don't run the check.
+          * maxMemory: Sets the maximum memory for Java which will be used to run
+                the queries.  The default value is '4g'.  Users may need to reduce this
+                value if they are using a 32-bit Java or increase it if they suspect they are
+                running out of memory (by using migabble to check the log).  Note the
+                numeric value can be suffixed with "g" for Gigabyte or "m" for Megabyte.
         """
         self.dbpath = path.abspath(dbpath)
         self.dbfile = dbfile
         self.suppress_gabble = suppress_gabble
+        self.maxMemory = maxMemory
 
         if miclasspath is None:
             self.miclasspath = _default_miclasspath
@@ -185,16 +191,16 @@ class LocalDBConn:
             self.miclasspath = path.abspath(miclasspath)
 
         if validatedb:
-            ## Print the scenarios in the database.  This will also allow us to check
-            ## whether the database is working
+            # Print the scenarios in the database.  This will also allow us to check whether the database is working
             dbscen = self.listScenariosInDB()
+
             if dbscen is None:
                 errmsg = "Failed to validate database: " + os.path.join(self.dbpath, self.dbfile) 
                 sys.stderr.write(errmsg+"\n")
-                raise Exception(errmsg)
+                raise IOError(errmsg)
+
             else:
                 sys.stdout.write("Database scenarios: {}\n".format(', '.join(dbscen['name'])))
-
 
     def runQuery(self, query, scenarios = None, regions = None, warn_empty = True):
         """Run a query on this connection
@@ -230,20 +236,34 @@ class LocalDBConn:
         ## strip newlines from query string
         querystr = re.sub("\n", "", query.querystr)
 
+        ## write the query to a temporary file which the command will then
+        ## reference to work around limits on windows
+        ## Note from the docs: the temporary file may not be visible to
+        ## the rest of the system until it is closed.  Therefore we must
+        ## set the flag not to delete on close and instead handle deleting
+        ## this temporary file ourselves
+        queryTempFile = tempfile.NamedTemporaryFile(mode='w', delete=False)
+
         cmd =  [
             "java",
             "-cp", self.miclasspath,
-            "-Xmx16g",               # TODO: add explicit memory size limits?
+            "-Xmx" + self.maxMemory,
             "-Dorg.basex.DBPATH=" + self.dbpath,
             "-DModelInterface.SUPPRESS_OUTPUT=" + sg,
             "org.basex.BaseX",
             "-smethod=csv",
             "-scsv=header=yes,format=xquery",
             "-i", self.dbfile,
-            "import module namespace mi = 'ModelInterface.ModelGUI2.xmldb.RunMIQuery';" + "mi:runMIQuery(" + querystr + "," + xqscen + "," + xqrgn + ")",
+            "RUN", queryTempFile.name
         ]
 
+        queryTempFile.write("import module namespace mi = 'ModelInterface.ModelGUI2.xmldb.RunMIQuery';" + "mi:runMIQuery(" + querystr + "," + xqscen + "," + xqrgn + ")")
+        queryTempFile.close()
+
         miout, mierr = _runmi(cmd, query.querystr)
+
+        ## clean up the query temp file now that the query has finished running
+        os.remove(queryTempFile.name)
 
         return _parserslt(miout, warn_empty, query.title, mierr)
 
@@ -264,7 +284,7 @@ class LocalDBConn:
         cmd =  [
             "java",
             "-cp", self.miclasspath,
-            "-Xmx4g",               # TODO: add explicit memory size limits?
+            "-Xmx" + self.maxMemory,
             "-Dorg.basex.DBPATH=" + self.dbpath,
             "org.basex.BaseX",
             "-smethod=csv",
