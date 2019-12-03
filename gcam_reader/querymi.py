@@ -108,23 +108,22 @@ def _parserslt(txt, warn_empty, title, stderr=""):
     else:
         return rslt
 
+
 def _runmi(cmd, querystr):
     v3_5 = 0x03050000
     try:
         if sys.hexversion >= v3_5:
-            ## python 3.5 or greater has the new interface
+            # python 3.5 or greater has the new interface
             mireturn = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE,
                               check = True, encoding="UTF-8")
             miout = mireturn.stdout
             mierr = mireturn.stderr
         else:
-            ## Annoyingly, sp.check_output isn't safe to use with
-            ## pipes for stdout and stderr, and there is no way to get
-            ## popen to check return codes and raise a
-            ## CalledProcessError if appropriate.  So, we have to
-            ## emulate this behavior ourselves.
+            # Annoyingly, sp.check_output isn't safe to use with pipes for stdout and stderr, and there is no
+            # way to get popen to check return codes and raise a CalledProcessError if appropriate. So, we have to
+            # emulate this behavior ourselves.
             if sys.version_info[0] < 3:
-                ## Python 2 doesn't have the encoding parameter
+                # Python 2 doesn't have the encoding parameter
                 miproc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
             else:
                 miproc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE,
@@ -133,7 +132,7 @@ def _runmi(cmd, querystr):
             if miproc.returncode != 0:
                 raise sp.CalledProcessError(returncode=1, cmd=cmd, output=mierr)
 
-        return (miout, mierr)
+        return miout, mierr
     
     except sp.CalledProcessError as e:
         sys.stderr.write("Model interface run failed.\n")
@@ -146,14 +145,7 @@ def _runmi(cmd, querystr):
             sys.stderr.write(e.output)
         raise
     
-            
-#### Database connection classes
 
-#### There are currently two variants: local and remote connections.
-#### The public interface comprises (for now) a single method:
-#### runQuery()
-    
-### Local DB connection
 class LocalDBConn:
     """Connection to a local GCAM database
     
@@ -161,6 +153,7 @@ class LocalDBConn:
     database, along with a class path for the java program used to
     extract data and some options to be passed to the functions that
     run the queries.
+
     """
 
     def __init__(self, dbpath, dbfile, suppress_gabble=True, miclasspath = None, validatedb=True):
