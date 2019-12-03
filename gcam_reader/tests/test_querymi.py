@@ -33,6 +33,8 @@ class QueryTests(unittest.TestCase):
         # create connection object
         self.conn = self.create_connection()
 
+        print(self.conn)
+
     @classmethod
     def create_connection(cls):
         """Create database connection."""

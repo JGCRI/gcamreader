@@ -1,7 +1,7 @@
 """Functions and classes for running GCAM output DB queries"""
 
 import sys
-import os
+
 if sys.version_info[0] < 3:
     from StringIO import StringIO
 else:
@@ -9,6 +9,7 @@ else:
 
 import os
 import os.path as path
+import pkg_resources
 import tempfile
 import re
 import subprocess as sp
@@ -65,13 +66,18 @@ def parse_batch_query(filename):
 ### Default class path for the GCAM model interface
 ### On unix this should produce something like:
 ###    /foo/bar/baz/jars/*:/foo/bar/baz/ModelInterface.jar
-_mifiles_dir = path.abspath(path.join(path.dirname(__file__), 'ModelInterface'))
+_mifiles_dir = pkg_resources.resource_filename('gcam_reader', 'ModelInterface')
+
+
 _default_miclasspath = (
     "{dir}{dsep}jars{dsep}*{psep}{dir}{dsep}ModelInterface.jar".format(
         dir=_mifiles_dir, 
         dsep=path.sep,          # directory separator
         psep=path.pathsep)      # path separator
 )
+
+print(_default_miclasspath)
+
 
 
 ### Helper functions for formatting and parsing queries
@@ -116,8 +122,7 @@ def _runmi(cmd, querystr):
     try:
         if sys.hexversion >= v3_5:
             # python 3.5 or greater has the new interface
-            mireturn = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE,
-                              check = True, encoding="UTF-8")
+            mireturn = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE, check=True, encoding="UTF-8")
             miout = mireturn.stdout
             mierr = mireturn.stderr
         else:
