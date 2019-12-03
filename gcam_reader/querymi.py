@@ -116,8 +116,6 @@ def _parserslt(txt, warn_empty, title, stderr=""):
 
 def _runmi(cmd, querystr):
 
-    print(cmd)
-
     v3_5 = 0x03050000
     try:
         if sys.hexversion >= v3_5:
