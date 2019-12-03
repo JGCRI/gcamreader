@@ -7,7 +7,9 @@ if sys.version_info[0] < 3:
 else:
     from io import StringIO
 
+import os
 import os.path as path
+import tempfile
 import re
 import subprocess as sp
 import pandas as pd
@@ -156,7 +158,7 @@ class LocalDBConn:
 
     """
 
-    def __init__(self, dbpath, dbfile, suppress_gabble=True, miclasspath = None, validatedb=True):
+    def __init__(self, dbpath, dbfile, suppress_gabble=True, miclasspath = None, validatedb=True, maxMemory='4g'):
         """Initialize a local db connection.
 
         params:
@@ -169,10 +171,16 @@ class LocalDBConn:
                 value points to a copy that was installed with this package.
           * validatedb: If True, check that a simple db query works on the
                 connection; otherwise, don't run the check.
+          * maxMemory: Sets the maximum memory for Java which will be used to run
+                the queries.  The default value is '4g'.  Users may need to reduce this
+                value if they are using a 32-bit Java or increase it if they suspect they are
+                running out of memory (by using migabble to check the log).  Note the
+                numeric value can be suffixed with "g" for Gigabyte or "m" for Megabyte.
         """
         self.dbpath = path.abspath(dbpath)
         self.dbfile = dbfile
         self.suppress_gabble = suppress_gabble
+        self.maxMemory = maxMemory
 
         if miclasspath is None:
             self.miclasspath = _default_miclasspath
@@ -225,20 +233,34 @@ class LocalDBConn:
         ## strip newlines from query string
         querystr = re.sub("\n", "", query.querystr)
 
+        ## write the query to a temporary file which the command will then
+        ## reference to work around limits on windows
+        ## Note from the docs: the temporary file may not be visible to
+        ## the rest of the system until it is closed.  Therefore we must
+        ## set the flag not to delete on close and instead handle deleting
+        ## this temporary file ourselves
+        queryTempFile = tempfile.NamedTemporaryFile(mode='w', delete=False)
+
         cmd =  [
             "java",
             "-cp", self.miclasspath,
-            "-Xmx16g",               # TODO: add explicit memory size limits?
+            "-Xmx" + self.maxMemory,
             "-Dorg.basex.DBPATH=" + self.dbpath,
             "-DModelInterface.SUPPRESS_OUTPUT=" + sg,
             "org.basex.BaseX",
             "-smethod=csv",
             "-scsv=header=yes,format=xquery",
             "-i", self.dbfile,
-            "import module namespace mi = 'ModelInterface.ModelGUI2.xmldb.RunMIQuery';" + "mi:runMIQuery(" + querystr + "," + xqscen + "," + xqrgn + ")",
+            "RUN", queryTempFile.name
         ]
 
+        queryTempFile.write("import module namespace mi = 'ModelInterface.ModelGUI2.xmldb.RunMIQuery';" + "mi:runMIQuery(" + querystr + "," + xqscen + "," + xqrgn + ")")
+        queryTempFile.close()
+
         miout, mierr = _runmi(cmd, query.querystr)
+
+        ## clean up the query temp file now that the query has finished running
+        os.remove(queryTempFile.name)
 
         return _parserslt(miout, warn_empty, query.title, mierr)
 
@@ -259,7 +281,7 @@ class LocalDBConn:
         cmd =  [
             "java",
             "-cp", self.miclasspath,
-            "-Xmx4g",               # TODO: add explicit memory size limits?
+            "-Xmx" + self.maxMemory,
             "-Dorg.basex.DBPATH=" + self.dbpath,
             "org.basex.BaseX",
             "-smethod=csv",
