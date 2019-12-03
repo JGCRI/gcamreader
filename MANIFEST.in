@@ -1,2 +1,5 @@
 include gcam_reader/ModelInterface/*
 include gcam_reader/ModelInterface/jars/*
+include gcam_reader/tests/data/comp_outputs/*.csv
+include gcam_reader/tests/data/queries/*.xml
+include gcam_reader/tests/data/sample_basexdb/*.basex

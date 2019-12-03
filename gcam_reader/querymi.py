@@ -1,6 +1,7 @@
 """Functions and classes for running GCAM output DB queries"""
 
 import sys
+
 if sys.version_info[0] < 3:
     from StringIO import StringIO
 else:
@@ -8,6 +9,7 @@ else:
 
 import os
 import os.path as path
+import pkg_resources
 import tempfile
 import re
 import subprocess as sp
@@ -16,6 +18,7 @@ import lxml.etree as ET
 
 ### Structure to hold a query (i.e., the stuff we send to the model
 ### interface)
+
 
 class Query:
     def __init__(self, xmlin):
@@ -63,7 +66,9 @@ def parse_batch_query(filename):
 ### Default class path for the GCAM model interface
 ### On unix this should produce something like:
 ###    /foo/bar/baz/jars/*:/foo/bar/baz/ModelInterface.jar
-_mifiles_dir = path.abspath(path.join(path.dirname(__file__), 'ModelInterface'))
+_mifiles_dir = pkg_resources.resource_filename('gcam_reader', 'ModelInterface')
+
+
 _default_miclasspath = (
     "{dir}{dsep}jars{dsep}*{psep}{dir}{dsep}ModelInterface.jar".format(
         dir=_mifiles_dir, 
@@ -108,23 +113,22 @@ def _parserslt(txt, warn_empty, title, stderr=""):
     else:
         return rslt
 
+
 def _runmi(cmd, querystr):
+
     v3_5 = 0x03050000
     try:
         if sys.hexversion >= v3_5:
-            ## python 3.5 or greater has the new interface
-            mireturn = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE,
-                              check = True, encoding="UTF-8")
+            # python 3.5 or greater has the new interface
+            mireturn = sp.run(cmd, stdout=sp.PIPE, stderr=sp.PIPE, check=True, encoding="UTF-8")
             miout = mireturn.stdout
             mierr = mireturn.stderr
         else:
-            ## Annoyingly, sp.check_output isn't safe to use with
-            ## pipes for stdout and stderr, and there is no way to get
-            ## popen to check return codes and raise a
-            ## CalledProcessError if appropriate.  So, we have to
-            ## emulate this behavior ourselves.
+            # Annoyingly, sp.check_output isn't safe to use with pipes for stdout and stderr, and there is no
+            # way to get popen to check return codes and raise a CalledProcessError if appropriate. So, we have to
+            # emulate this behavior ourselves.
             if sys.version_info[0] < 3:
-                ## Python 2 doesn't have the encoding parameter
+                # Python 2 doesn't have the encoding parameter
                 miproc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
             else:
                 miproc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE,
@@ -133,7 +137,7 @@ def _runmi(cmd, querystr):
             if miproc.returncode != 0:
                 raise sp.CalledProcessError(returncode=1, cmd=cmd, output=mierr)
 
-        return (miout, mierr)
+        return miout, mierr
     
     except sp.CalledProcessError as e:
         sys.stderr.write("Model interface run failed.\n")
@@ -146,14 +150,7 @@ def _runmi(cmd, querystr):
             sys.stderr.write(e.output)
         raise
     
-            
-#### Database connection classes
 
-#### There are currently two variants: local and remote connections.
-#### The public interface comprises (for now) a single method:
-#### runQuery()
-    
-### Local DB connection
 class LocalDBConn:
     """Connection to a local GCAM database
     
@@ -161,6 +158,7 @@ class LocalDBConn:
     database, along with a class path for the java program used to
     extract data and some options to be passed to the functions that
     run the queries.
+
     """
 
     def __init__(self, dbpath, dbfile, suppress_gabble=True, miclasspath = None, validatedb=True, maxMemory='4g'):
@@ -193,16 +191,16 @@ class LocalDBConn:
             self.miclasspath = path.abspath(miclasspath)
 
         if validatedb:
-            ## Print the scenarios in the database.  This will also allow us to check
-            ## whether the database is working
+            # Print the scenarios in the database.  This will also allow us to check whether the database is working
             dbscen = self.listScenariosInDB()
+
             if dbscen is None:
                 errmsg = "Failed to validate database: " + os.path.join(self.dbpath, self.dbfile) 
                 sys.stderr.write(errmsg+"\n")
-                raise Exception(errmsg)
+                raise IOError(errmsg)
+
             else:
                 sys.stdout.write("Database scenarios: {}\n".format(', '.join(dbscen['name'])))
-
 
     def runQuery(self, query, scenarios = None, regions = None, warn_empty = True):
         """Run a query on this connection
