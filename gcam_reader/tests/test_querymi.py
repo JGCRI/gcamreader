@@ -37,10 +37,9 @@ class QueryTests(unittest.TestCase):
     def create_connection(cls):
         """Create database connection."""
 
-        import sys
-        sys.stdout(cls.TEST_GCAM_DB_PATH)
-        sys.stdout(cls.TEST_GCAM_DB)
-        
+        print(cls.TEST_GCAM_DB_PATH)
+        print(cls.TEST_GCAM_DB)
+
         return gcam_reader.LocalDBConn(cls.TEST_GCAM_DB_PATH, cls.TEST_GCAM_DB)
 
     def test_connection(self):
