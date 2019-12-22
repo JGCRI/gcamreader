@@ -244,28 +244,30 @@ class LocalDBConn:
         ## this temporary file ourselves
         queryTempFile = tempfile.NamedTemporaryFile(mode='w', delete=False)
 
-        cmd =  [
-            "java",
-            "-cp", self.miclasspath,
-            "-Xmx" + self.maxMemory,
-            "-Dorg.basex.DBPATH=" + self.dbpath,
-            "-DModelInterface.SUPPRESS_OUTPUT=" + sg,
-            "org.basex.BaseX",
-            "-smethod=csv",
-            "-scsv=header=yes,format=xquery",
-            "-i", self.dbfile,
-            "RUN", queryTempFile.name
-        ]
+        try: 
+            cmd =  [
+                "java",
+                "-cp", self.miclasspath,
+                "-Xmx" + self.maxMemory,
+                "-Dorg.basex.DBPATH=" + self.dbpath,
+                "-DModelInterface.SUPPRESS_OUTPUT=" + sg,
+                "org.basex.BaseX",
+                "-smethod=csv",
+                "-scsv=header=yes,format=xquery",
+                "-i", self.dbfile,
+                "RUN", queryTempFile.name
+            ]
 
-        queryTempFile.write("import module namespace mi = 'ModelInterface.ModelGUI2.xmldb.RunMIQuery';" + "mi:runMIQuery(" + querystr + "," + xqscen + "," + xqrgn + ")")
-        queryTempFile.close()
+            queryTempFile.write("import module namespace mi = 'ModelInterface.ModelGUI2.xmldb.RunMIQuery';" + "mi:runMIQuery(" + querystr + "," + xqscen + "," + xqrgn + ")")
+            queryTempFile.close()
 
-        miout, mierr = _runmi(cmd, query.querystr)
+            miout, mierr = _runmi(cmd, query.querystr)
 
-        ## clean up the query temp file now that the query has finished running
-        os.remove(queryTempFile.name)
+            return _parserslt(miout, warn_empty, query.title, mierr)
 
-        return _parserslt(miout, warn_empty, query.title, mierr)
+        finally:
+            ## clean up the query temp file now that the query has finished running
+            os.remove(queryTempFile.name)
 
     def listScenariosInDB(self):
         """Lists the Scenarios contained in a GCAM Database
