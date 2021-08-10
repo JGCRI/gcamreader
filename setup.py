@@ -14,7 +14,7 @@ setup(
     install_requires=[
         "requests~=2.18.4",
         "pandas~=1.2.4",
-        "lxml~=4.2.1"
+        "lxml~=4.6.3"
     ],
     include_package_data=True,
     zip_safe=False
