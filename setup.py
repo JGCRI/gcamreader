@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="gcam_reader",
-    version="1.2.0",
+    version="1.2.1",
     python_requires=">=3.6",
     packages=find_packages(),
     description="Tools for importing GCAM output data",
