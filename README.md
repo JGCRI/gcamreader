@@ -2,7 +2,7 @@
 [![codecov](https://codecov.io/gh/JGCRI/gcamreader/branch/master/graph/badge.svg?token=Az2MWAQbwj)](https://codecov.io/gh/JGCRI/gcamreader)
 [![DOI](https://zenodo.org/badge/100425913.svg)](https://zenodo.org/badge/latestdoi/100425913)
 
-# gcam_reader: A python package for importing GCAM data
+# gcamreader: A python package for importing GCAM data
 
 #### `gcamreader` provides functions for reading data from output databases produced by [GCAM](https://github.com/JGCRI/gcam-core) 
 
@@ -14,7 +14,7 @@
 
 - Integrate GCAM with other Python packages
 
-### Install `gcam_reader`
+### Install `gcamreader`
 
 ```bash
 pip install gcamreader
