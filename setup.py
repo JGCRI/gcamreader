@@ -1,12 +1,19 @@
 from setuptools import setup, find_packages
 
 
+def readme():
+    """Return the contents of the project README file."""
+    with open('README.md') as f:
+        return f.read()
+
 setup(
     name="gcamreader",
     version="1.2.3",
     python_requires=">=3.6",
     packages=find_packages(),
     description="Tools for importing GCAM output data",
+    long_description=readme(),
+    long_description_content_type="text/markdown",
     url="https://github.com/JGCRI/gcam_reader",
     license='BSD 2-Clause',
     author="Robert Link",
