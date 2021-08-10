@@ -8,7 +8,7 @@
 
 ### Purpose
 
-`gcam_reader` was created to:
+`gcamreader` was created to:
 
 - Use XML queries to extract data into a Pandas DataFrame from a GCAM XML database
 
