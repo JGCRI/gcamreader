@@ -66,7 +66,7 @@ def parse_batch_query(filename):
 ### Default class path for the GCAM model interface
 ### On unix this should produce something like:
 ###    /foo/bar/baz/jars/*:/foo/bar/baz/ModelInterface.jar
-_mifiles_dir = pkg_resources.resource_filename('gcam_reader', 'ModelInterface')
+_mifiles_dir = pkg_resources.resource_filename('gcamreader', 'ModelInterface')
 
 
 _default_miclasspath = (
