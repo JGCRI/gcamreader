@@ -8,13 +8,13 @@ def readme():
 
 setup(
     name="gcamreader",
-    version="1.2.4",
+    version="1.2.5",
     python_requires=">=3.6",
     packages=find_packages(),
     description="Tools for importing GCAM output data",
     long_description=readme(),
     long_description_content_type="text/markdown",
-    url="https://github.com/JGCRI/gcam_reader",
+    url="https://github.com/JGCRI/gcamreader",
     license='BSD 2-Clause',
     author="Robert Link",
     author_email="robert.link@pnnl.gov",
