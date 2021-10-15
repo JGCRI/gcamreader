@@ -8,7 +8,7 @@ def readme():
 
 setup(
     name="gcamreader",
-    version="1.2.5",
+    version="1.2.6",
     python_requires=">=3.6",
     packages=find_packages(),
     description="Tools for importing GCAM output data",
