@@ -104,6 +104,14 @@ def _parserslt(txt, warn_empty, title, stderr=""):
 
     try:
         rslt = pd.read_csv(buf)
+        # The value column name is always assumed to be "value"
+        value_col_name = "value"
+        cols = rslt.columns
+        # if we have a value column then aggregate, otherwise it may
+        # just be listing the scenario information and no aggregation
+        # is necessary
+        if cols.str.contains(value_col_name).any():
+            rslt = rslt.groupby(cols.drop(value_col_name).to_list(), as_index=False).sum()
     except EmptyDataError:
         if warn_empty:
             sys.stderr.write("Model interface returned empty string.\n")

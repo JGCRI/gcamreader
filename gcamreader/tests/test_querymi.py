@@ -49,11 +49,13 @@ class QueryTests(unittest.TestCase):
         # get land allocation query
         query = gcamreader.parse_batch_query(QueryTests.TEST_LAND_QUERY)[0]
 
+        sort_columns = ['region', 'land-allocation', 'Year']
+
         # get run output for land
-        df = self.conn.runQuery(query)
+        df = self.conn.runQuery(query).sort_values(by=sort_columns, ignore_index=True)
 
         # test full equality with comparison output data
-        pd.testing.assert_frame_equal(df, QueryTests.COMP_LAND_OUTPUT)
+        pd.testing.assert_frame_equal(df, QueryTests.COMP_LAND_OUTPUT.sort_values(by=sort_columns, ignore_index=True))
 
 
 if __name__ == '__main__':
