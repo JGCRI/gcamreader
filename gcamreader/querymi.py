@@ -40,7 +40,7 @@ class Query:
             xmlq = xmlin
 
         query = xmlq.find('./*[@title]')
-        self.querystr = ET.tounicode(query)
+        self.querystr = ET.tostring(query, encoding='unicode')
 
         regions = xmlq.findall('region')
         if len(regions) == 0:
