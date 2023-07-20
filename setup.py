@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
 
+VERSION = "1.3.0"
 
 def readme():
     """Return the contents of the project README file."""
@@ -8,7 +9,7 @@ def readme():
 
 setup(
     name="gcamreader",
-    version="1.2.6",
+    version=VERSION,
     python_requires=">=3.6",
     packages=find_packages(),
     description="Tools for importing GCAM output data",
@@ -22,7 +23,13 @@ setup(
         "requests~=2.20.0",
         "pandas>=1.2.4",
         "lxml>=4.6.3"
+        "click",
+        "click-default-group-wheel",
     ],
+    entry_points="""
+        [console_scripts]
+        gcamreader=gcamreader.cli:cli
+    """,
     include_package_data=True,
     zip_safe=False
-    )
+)
