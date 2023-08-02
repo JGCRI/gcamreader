@@ -35,14 +35,13 @@ class Query:
 
         if xmlin.__class__ is str:
             parser = ET.XMLParser(strip_cdata=False)
-            xmlq = ET.XML(xmlin, parser)
+            query = ET.XML(xmlin, parser)
         else:
-            xmlq = xmlin
+            query = xmlin
 
-        query = xmlq.find('./*[@title]')
         self.querystr = ET.tostring(query, encoding='unicode')
 
-        regions = xmlq.findall('region')
+        regions = query.findall("region")
         if len(regions) == 0:
             self.regions = None
         else:
@@ -57,7 +56,7 @@ def parse_batch_query(filename):
     parser = ET.XMLParser(strip_cdata=False)
     root = ET.parse(filename, parser)
 
-    queries = root.findall('aQuery')
+    queries = root.xpath("//*[@title]")
 
     return [Query(q) for q in queries]
 
