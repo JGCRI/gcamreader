@@ -115,7 +115,7 @@ def _parserslt(txt, warn_empty, title, stderr=""):
     except EmptyDataError:
         if warn_empty:
             sys.stderr.write("Model interface returned empty string.\n")
-            sys.stderr.write("Query string: \n\t{}\n".format(query))
+            sys.stderr.write("Query title: \n\t{}\n".format(title))
             sys.stderr.write("Model interface stderr output:\n\t{}\n".format(stderr))
         return None
     else:
