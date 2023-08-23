@@ -24,7 +24,7 @@ setup(
         "pandas>=1.2.4",
         "lxml>=4.6.3"
         "click>=8.1.7",
-        "click-default-group-wheel>=1.2.2",
+        "click-default-group>=1.2.2",
     ],
     entry_points="""
         [console_scripts]
