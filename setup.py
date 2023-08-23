@@ -10,7 +10,7 @@ def readme():
 setup(
     name="gcamreader",
     version=VERSION,
-    python_requires=">=3.6",
+    python_requires=">=3.9",
     packages=find_packages(),
     description="Tools for importing GCAM output data",
     long_description=readme(),
@@ -23,8 +23,8 @@ setup(
         "requests~=2.20.0",
         "pandas>=1.2.4",
         "lxml>=4.6.3"
-        "click>=8.1",
-        "click-default-group-wheel>=1.2",
+        "click>=8.1.7",
+        "click-default-group-wheel>=1.2.2",
     ],
     entry_points="""
         [console_scripts]
