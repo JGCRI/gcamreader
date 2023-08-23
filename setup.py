@@ -23,8 +23,8 @@ setup(
         "requests~=2.20.0",
         "pandas>=1.2.4",
         "lxml>=4.6.3"
-        "click",
-        "click-default-group-wheel",
+        "click>=8.1",
+        "click-default-group-wheel>=1.2",
     ],
     entry_points="""
         [console_scripts]
