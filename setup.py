@@ -22,7 +22,7 @@ setup(
     install_requires=[
         "requests~=2.20.0",
         "pandas>=1.2.4",
-        "lxml>=4.6.3"
+        "lxml>=4.6.3",
         "click",
         "click-default-group-wheel",
     ],
