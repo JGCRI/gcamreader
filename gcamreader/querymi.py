@@ -84,6 +84,19 @@ def _modelinterface_dir() -> str:
     return str(resources.files("gcamreader") / "ModelInterface")
 
 
+def sample_data_dir() -> str:
+    """Return the filesystem path to the bundled sample data directory.
+
+    The sample data directory contains a small example BaseX database, an
+    example query, and a reference output, all used by the test suite and
+    examples.
+
+    Returns:
+        The absolute path to the ``data`` package data directory.
+    """
+    return str(resources.files("gcamreader") / "data")
+
+
 # Default class path for the GCAM model interface. On unix this produces
 # something like:
 #     /foo/bar/baz/jars/*:/foo/bar/baz/ModelInterface.jar

@@ -25,8 +25,7 @@ import pytest
 
 import gcamreader
 
-PACKAGE_DIR = Path(gcamreader.__file__).resolve().parent
-DATA_DIR = PACKAGE_DIR / "tests" / "data"
+DATA_DIR = Path(gcamreader.sample_data_dir())
 SAMPLE_DB_NAME = "sample_basexdb"
 LAND_QUERY = DATA_DIR / "queries" / "query_land_reg32_basin235_gcam5p0.xml"
 

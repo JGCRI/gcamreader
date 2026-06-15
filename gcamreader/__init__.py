@@ -10,6 +10,7 @@ from gcamreader.querymi import (
     RemoteDBConn,
     importdata,
     parse_batch_query,
+    sample_data_dir,
 )
 
 __version__ = "1.5.0"
@@ -20,5 +21,6 @@ __all__ = [
     "LocalDBConn",
     "RemoteDBConn",
     "importdata",
+    "sample_data_dir",
     "__version__",
 ]

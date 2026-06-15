@@ -69,7 +69,6 @@ exclude = ["tests*", "notebooks*", "benchmarks*"]
 gcamreader = [
     "ModelInterface/**/*",
     "data/**/*",
-    "tests/data/**/*",
 ]
 
 [tool.pytest.ini_options]
