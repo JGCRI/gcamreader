@@ -11,9 +11,12 @@ requires-python = ">=3.11"
 license = { text = "BSD-2-Clause" }
 authors = [
     { name = "Robert Link" },
+    { name = "Chris R. Vernon", email = "chris.vernon@pnnl.gov" },
+    { name = "Pralit Patel", email = "pralit.patel@pnnl.gov" },
 ]
 maintainers = [
     { name = "Chris R. Vernon", email = "chris.vernon@pnnl.gov" },
+    { name = "Pralit Patel", email = "pralit.patel@pnnl.gov" },
 ]
 keywords = ["gcam", "energy", "land", "water", "climate", "xml", "basex"]
 classifiers = [

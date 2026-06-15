@@ -3,7 +3,7 @@
 [![lint](https://github.com/JGCRI/gcamreader/actions/workflows/lint.yml/badge.svg)](https://github.com/JGCRI/gcamreader/actions/workflows/lint.yml)
 [![DOI](https://zenodo.org/badge/100425913.svg)](https://zenodo.org/badge/latestdoi/100425913)
 
-# gcamreader: a Python package for importing GCAM data
+# gcamreader: a Python package for extracting content from GCAM databases
 
 `gcamreader` provides functions for reading data from the output databases
 produced by [GCAM](https://github.com/JGCRI/gcam-core).
