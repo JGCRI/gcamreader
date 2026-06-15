@@ -84,6 +84,9 @@ target-version = ["py311", "py312", "py313"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+extend-exclude = ["*.ipynb", "docs/_build"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+# Line length is enforced by black, which permits occasional overflow.
+ignore = ["E501"]

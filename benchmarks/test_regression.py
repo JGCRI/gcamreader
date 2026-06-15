@@ -73,7 +73,7 @@ def manifest() -> dict:
 
 
 @pytest.fixture(scope="module")
-def connection() -> "gcamreader.LocalDBConn":
+def connection() -> gcamreader.LocalDBConn:
     """Create a local database connection to the bundled sample database.
 
     Returns:
@@ -99,7 +99,7 @@ def test_parse_batch_query_matches_baseline() -> None:
 @requires_baseline
 @requires_java
 def test_list_scenarios_matches_baseline(
-    connection: "gcamreader.LocalDBConn",
+    connection: gcamreader.LocalDBConn,
 ) -> None:
     """listScenariosInDB output must match the recorded baseline."""
     expected = pd.read_csv(QUERY_OUTPUT_DIR / "list_scenarios.csv")
@@ -112,7 +112,7 @@ def test_list_scenarios_matches_baseline(
 @requires_baseline
 @requires_java
 def test_land_query_matches_baseline(
-    connection: "gcamreader.LocalDBConn",
+    connection: gcamreader.LocalDBConn,
 ) -> None:
     """runQuery for the land-allocation query must match the baseline."""
     expected = pd.read_csv(QUERY_OUTPUT_DIR / "land_query.csv")

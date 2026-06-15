@@ -53,14 +53,14 @@ def test_parse_batch_query(land_query_path: Path) -> None:
 
 
 @requires_java
-def test_connection(connection: "gcamreader.LocalDBConn") -> None:
+def test_connection(connection: gcamreader.LocalDBConn) -> None:
     """The connection object should be a LocalDBConn instance."""
     assert isinstance(connection, gcamreader.LocalDBConn)
 
 
 @requires_java
 def test_land_query(
-    connection: "gcamreader.LocalDBConn",
+    connection: gcamreader.LocalDBConn,
     land_query_path: Path,
     comp_land_output_path: Path,
 ) -> None:

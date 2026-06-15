@@ -51,7 +51,7 @@ def comp_land_output_path() -> Path:
 
 
 @pytest.fixture
-def connection() -> "gcamreader.LocalDBConn":
+def connection() -> gcamreader.LocalDBConn:
     """Create a local database connection to the bundled sample database.
 
     Returns:

@@ -34,7 +34,7 @@ class Query:
         title: The query title.
     """
 
-    def __init__(self, xmlin: "str | ET._Element") -> None:
+    def __init__(self, xmlin: str | ET._Element) -> None:
         """Initialize a query structure from an XML definition.
 
         Args:
@@ -110,7 +110,7 @@ _default_miclasspath = (
 
 
 # Helper functions for formatting and parsing queries.
-def _querylist(items: "str | list[str] | None") -> str:
+def _querylist(items: str | list[str] | None) -> str:
     """Format a region or scenario list as an XQuery sequence literal.
 
     Args:
@@ -187,9 +187,7 @@ def _runmi(cmd: list[str], querystr: str) -> tuple[str, str]:
             return code.
     """
     try:
-        mireturn = sp.run(
-            cmd, stdout=sp.PIPE, stderr=sp.PIPE, check=True, encoding="UTF-8"
-        )
+        mireturn = sp.run(cmd, capture_output=True, check=True, encoding="UTF-8")
         return mireturn.stdout, mireturn.stderr
     except sp.CalledProcessError as e:
         sys.stderr.write("Model interface run failed.\n")
@@ -263,7 +261,7 @@ class LocalDBConn:
                     self.dbpath, self.dbfile
                 )
                 sys.stderr.write(errmsg + "\n")
-                raise IOError(errmsg)
+                raise OSError(errmsg)
 
             sys.stdout.write(
                 "Database scenarios: {}\n".format(", ".join(dbscen["name"]))
@@ -272,8 +270,8 @@ class LocalDBConn:
     def runQuery(
         self,
         query: Query,
-        scenarios: "str | list[str] | None" = None,
-        regions: "str | list[str] | None" = None,
+        scenarios: str | list[str] | None = None,
+        regions: str | list[str] | None = None,
         warn_empty: bool = True,
     ) -> pd.DataFrame | None:
         """Run a query on this connection.
@@ -464,8 +462,8 @@ class RemoteDBConn:
     def runQuery(
         self,
         query: Query,
-        scenarios: "str | list[str] | None" = None,
-        regions: "str | list[str] | None" = None,
+        scenarios: str | list[str] | None = None,
+        regions: str | list[str] | None = None,
         warn_empty: bool = True,
     ) -> pd.DataFrame | None:
         """Run a query on this connection.
@@ -502,7 +500,7 @@ class RemoteDBConn:
             [
                 "import module namespace mi = "
                 "'ModelInterface.ModelGUI2.xmldb.RunMIQuery';",
-                "mi:runMIQuery({}, {}, {})".format(query.querystr, xqscen, xqrgn),
+                f"mi:runMIQuery({query.querystr}, {xqscen}, {xqrgn})",
             ]
         )
         # Handle nested CDATA tags.
@@ -579,10 +577,10 @@ class RemoteDBConn:
 
 
 def importdata(
-    dbspec: "str | LocalDBConn | RemoteDBConn",
-    queries: "str | list[Query]",
-    scenarios: "str | list[str] | None" = None,
-    regions: "str | list[str] | None" = None,
+    dbspec: str | LocalDBConn | RemoteDBConn,
+    queries: str | list[Query],
+    scenarios: str | list[str] | None = None,
+    regions: str | list[str] | None = None,
     warn_empty: bool = False,
     suppress_gabble: bool = True,
     miclasspath: str | None = None,

@@ -252,7 +252,7 @@ def save(data: dict) -> None:
 
 
 def execute(
-    conn: "LocalDBConn | RemoteDBConn",
+    conn: LocalDBConn | RemoteDBConn,
     query_path: Path,
     output_path: Path,
     force: bool,

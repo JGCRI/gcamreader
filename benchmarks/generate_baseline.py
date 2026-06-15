@@ -21,7 +21,7 @@ import json
 import platform
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -113,7 +113,7 @@ def capture_parse_batch_query() -> dict:
     }
 
 
-def capture_scenarios(conn: "gcamreader.LocalDBConn") -> pd.DataFrame:
+def capture_scenarios(conn: gcamreader.LocalDBConn) -> pd.DataFrame:
     """Capture :meth:`LocalDBConn.listScenariosInDB` output.
 
     Args:
@@ -125,7 +125,7 @@ def capture_scenarios(conn: "gcamreader.LocalDBConn") -> pd.DataFrame:
     return conn.listScenariosInDB()
 
 
-def capture_land_query(conn: "gcamreader.LocalDBConn") -> pd.DataFrame:
+def capture_land_query(conn: gcamreader.LocalDBConn) -> pd.DataFrame:
     """Run the bundled land-allocation query and return a sorted DataFrame.
 
     Args:
@@ -197,9 +197,7 @@ def main() -> None:
     print(f"wrote {parsed_path.name}")
 
     # Establish a connection (validation also exercises listScenariosInDB).
-    conn = gcamreader.LocalDBConn(
-        str(DATA_DIR), SAMPLE_DB_NAME, suppress_gabble=True
-    )
+    conn = gcamreader.LocalDBConn(str(DATA_DIR), SAMPLE_DB_NAME, suppress_gabble=True)
 
     # 2. listScenariosInDB.
     scenarios = capture_scenarios(conn)
@@ -229,7 +227,7 @@ def main() -> None:
         print(f"wrote cli_outputs/{cli_file.name}")
 
     manifest = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "gcamreader_version": getattr(gcamreader, "__version__", "1.4.0"),
         "python_version": platform.python_version(),
         "platform": platform.platform(),
