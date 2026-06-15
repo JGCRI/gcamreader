@@ -177,7 +177,6 @@ def capture_cli() -> list[Path]:
             "-o",
             str(CLI_OUTPUT_DIR),
             "-f",
-            "True",
         ],
         check=True,
     )

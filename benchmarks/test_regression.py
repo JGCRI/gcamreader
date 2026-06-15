@@ -154,7 +154,6 @@ def test_cli_output_matches_baseline(tmp_path: Path, manifest: dict) -> None:
             "-o",
             str(tmp_path),
             "-f",
-            "True",
         ],
         check=True,
     )
