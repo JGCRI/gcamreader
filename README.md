@@ -1,5 +1,6 @@
 [![build](https://github.com/JGCRI/gcamreader/actions/workflows/build.yml/badge.svg)](https://github.com/JGCRI/gcamreader/actions/workflows/build.yml)
 [![docs](https://github.com/JGCRI/gcamreader/actions/workflows/docs.yml/badge.svg)](https://github.com/JGCRI/gcamreader/actions/workflows/docs.yml)
+[![lint](https://github.com/JGCRI/gcamreader/actions/workflows/lint.yml/badge.svg)](https://github.com/JGCRI/gcamreader/actions/workflows/lint.yml)
 [![codecov](https://codecov.io/gh/JGCRI/gcamreader/branch/main/graph/badge.svg?token=Az2MWAQbwj)](https://codecov.io/gh/JGCRI/gcamreader)
 [![DOI](https://zenodo.org/badge/100425913.svg)](https://zenodo.org/badge/latestdoi/100425913)
 
