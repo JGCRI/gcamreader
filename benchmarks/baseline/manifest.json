@@ -1,0 +1,21 @@
+{
+  "fixtures": {
+    "cli_outputs/crop_land_allocation.csv": "82dd106d12e14f32d4e9828e5a4ebb3d0cb78580da33dc5de9a8b9f0124f250b",
+    "parse_batch_query.json": "b83c9a39d7aee7cbc76535c4bb154bdafdfe96e550ac1709740bd856eb3fbdd2",
+    "query_outputs/importdata_land.csv": "a7574c25b04446bcb27029b4547acac45f546415ebd5cc3fa310bd8c9742a445",
+    "query_outputs/land_query.csv": "a7574c25b04446bcb27029b4547acac45f546415ebd5cc3fa310bd8c9742a445",
+    "query_outputs/list_scenarios.csv": "341660163c5f0c578f0aa44cdfe29dee4feca5af030bdeeea4652cccb98da690"
+  },
+  "gcamreader_version": "1.4.0",
+  "generated_at": "2026-06-15T14:49:02.899808+00:00",
+  "java_version": "openjdk version \"23.0.2\" 2025-01-21\nOpenJDK Runtime Environment Homebrew (build 23.0.2)\nOpenJDK 64-Bit Server VM Homebrew (build 23.0.2, mixed mode, sharing)",
+  "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+  "python_version": "3.13.3",
+  "sort_columns": {
+    "land_query": [
+      "region",
+      "land-allocation",
+      "Year"
+    ]
+  }
+}
