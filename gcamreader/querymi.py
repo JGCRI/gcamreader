@@ -181,6 +181,11 @@ def _parserslt(
 ) -> pd.DataFrame | None:
     """Parse a model interface CSV result string into a pandas DataFrame.
 
+    When a ``value`` column is present, rows sharing all non-value columns are
+    summed. Aggregation uses ``dropna=False`` so that rows containing missing
+    values in one or more grouping columns are retained rather than silently
+    dropped.
+
     Args:
         txt: The text returned by the query.
         warn_empty: Whether to emit a warning when the result is empty.

@@ -51,6 +51,13 @@ Changed
 - Moved the test suite to a top level ``tests/`` directory and the example
   notebooks to a top level ``notebooks/`` directory.
 
+Fixed
+~~~~~
+
+- Result parsing in ``_parserslt`` now aggregates with ``dropna=False``, so rows
+  that contain missing values in one or more grouping columns are retained
+  instead of being silently dropped during the ``groupby().sum()`` step (PR #40).
+
 Removed
 ~~~~~~~
 
