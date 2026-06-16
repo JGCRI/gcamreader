@@ -14,9 +14,11 @@ pandas DataFrames.
    steps: locate the data, connect, run queries (filtering by scenario and
    region), and analyze.
 
+Contents
+--------
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents
 
    installation
    usage
@@ -24,10 +26,4 @@ pandas DataFrames.
    verified_versions
    api
    contributing
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   changelog

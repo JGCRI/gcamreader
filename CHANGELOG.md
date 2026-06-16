@@ -40,5 +40,30 @@ used as a regression gate to guarantee identical query outputs.
 - `setup.py`, `setup.cfg`, `requirements.txt`, and `MANIFEST.in` (superseded by
   `pyproject.toml`).
 
+### Release verification
+
+**Result: PASS — v1.5.0 reproduces the v1.4.0 outputs exactly.**
+
+A behavioral baseline captured from v1.4.0 (`benchmarks/baseline/`) is re-run
+against the v1.5.0 code by `benchmarks/test_regression.py`. Every fixture
+matches: CSV outputs are compared byte-for-byte by SHA-256 checksum, and
+DataFrame outputs are compared with `pandas.testing.assert_frame_equal` after a
+deterministic sort.
+
+| Operation | Result | Comparison | Java |
+| --- | --- | --- | --- |
+| `parse_batch_query` (query structure) | identical | exact title/region/query strings | not required |
+| `listScenariosInDB` | identical | `assert_frame_equal` | required |
+| `runQuery` (land-allocation query) | identical | `assert_frame_equal` (sorted) | required |
+| `importdata` (land-allocation query) | identical | `assert_frame_equal` (sorted) | required |
+| `gcamreader local` CLI CSV output | identical | SHA-256 (byte-for-byte) | required |
+
+Baseline captured with gcamreader 1.4.0 on Python 3.13.3, OpenJDK 23.0.2
+(Homebrew), macOS 26.5.1 (arm64). Reproduce locally with:
+
+```bash
+pytest benchmarks/test_regression.py
+```
+
 [Unreleased]: https://github.com/JGCRI/gcamreader/compare/v1.5.0...HEAD
 [1.5.0]: https://github.com/JGCRI/gcamreader/compare/v1.4.0...v1.5.0
