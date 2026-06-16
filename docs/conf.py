@@ -34,6 +34,16 @@ source_suffix = {
 html_theme = "furo"
 html_static_path = ["_static"]
 
+# Hide the "gcamreader X.Y.Z documentation" text in the sidebar and show the logo
+# instead. Furo supports separate logos for light and dark mode; the white logo is
+# used for dark mode and the transparent (colored) logo for light mode so it stays
+# visible against either sidebar background.
+html_theme_options = {
+    "sidebar_hide_name": True,
+    "light_logo": "gcamreader-logo-transparent.png",
+    "dark_logo": "gcamreader-logo-white.png",
+}
+
 autodoc_typehints = "description"
 autodoc_member_order = "bysource"
 napoleon_google_docstring = True

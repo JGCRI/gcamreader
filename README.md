@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/_static/gcamreader-logo-transparent.png" alt="gcamreader logo" width="400" />
+</p>
+
 [![build](https://github.com/JGCRI/gcamreader/actions/workflows/build.yml/badge.svg)](https://github.com/JGCRI/gcamreader/actions/workflows/build.yml)
 [![docs](https://github.com/JGCRI/gcamreader/actions/workflows/docs.yml/badge.svg)](https://github.com/JGCRI/gcamreader/actions/workflows/docs.yml)
 [![lint](https://github.com/JGCRI/gcamreader/actions/workflows/lint.yml/badge.svg)](https://github.com/JGCRI/gcamreader/actions/workflows/lint.yml)
