@@ -2,7 +2,7 @@ name: docs
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, release/v1.5.0]
   pull_request:
 
 concurrency:
