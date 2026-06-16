@@ -204,7 +204,7 @@ def _parserslt(
         # listing the scenario information and no aggregation is necessary.
         if cols.str.contains(value_col_name).any():
             rslt = rslt.groupby(
-                cols.drop(value_col_name).to_list(), as_index=False
+                cols.drop(value_col_name).to_list(), as_index=False, dropna=False
             ).sum()
     except EmptyDataError:
         if warn_empty:

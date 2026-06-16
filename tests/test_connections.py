@@ -29,6 +29,23 @@ class TestParserslt:
         forest = df[(df["region"] == "USA") & (df["land-allocation"] == "Forest")]
         assert forest["value"].iloc[0] == pytest.approx(15.0)
 
+    def test_aggregates_value_rows_with_missing_grouping_values(self) -> None:
+        """Rows with missing grouping values should be retained during aggregation."""
+        csv = (
+            "scenario,region,land-allocation,technology,Year,value\n"
+            "Reference,USA,Forest,,2010,10.0\n"
+            "Reference,USA,Forest,,2010,5.0\n"
+            "Reference,USA,Corn,Irrigated,2010,2.0\n"
+        )
+
+        df = querymi._parserslt(csv, warn_empty=True, title="t")
+
+        assert df is not None
+        forest = df[(df["region"] == "USA") & (df["land-allocation"] == "Forest")]
+        assert len(forest) == 1
+        assert pd.isna(forest["technology"].iloc[0])
+        assert forest["value"].iloc[0] == pytest.approx(15.0)
+
     def test_no_value_column_is_passed_through(
         self, sample_scenario_csv: str
     ) -> None:
