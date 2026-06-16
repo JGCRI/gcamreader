@@ -17,6 +17,9 @@ The full design rationale lives in
   status codes rather than raised, so one bad version cannot abort the array.
 - `aggregate_results.py` — merges all per-version JSON records into
   `results/version_compat_summary.csv` and `results/VERIFIED_VERSIONS.md`.
+- `plot_query_rows.py` — renders a self-contained SVG diagnostic of the
+  benchmark query's row count across versions (no matplotlib required) into
+  `docs/_static/query_rows_by_version.svg`.
 - `queries/land_allocation.xml` — the cross-version benchmark query (a copy of
   the bundled land-allocation query). Add more XML files here to broaden
   coverage.
@@ -76,3 +79,24 @@ to the GCAM database filesystem. Both are present on deception via Lmod.
 
 `QUERY_EMPTY` and `QUERY_FAIL` are the most informative signals for detecting
 where the bundled queries diverge from a given GCAM schema.
+
+## Latest results
+
+The committed run (`gcamreader 1.5.0`, Python 3.13.5, Java 17.0.18 on
+deception) verified **all 22 of 22** versions as `PASS`. See
+[`results/VERIFIED_VERSIONS.md`](results/VERIFIED_VERSIONS.md) for the full
+matrix and [`docs/verified_versions.rst`](../../docs/verified_versions.rst) for
+the rendered documentation page.
+
+- **GCAM 5.3 - 9.1**: all `PASS`. The land-allocation query returns 477k-747k
+  rows in roughly 33-60 seconds at `-Xmx16g`; scenario listing takes under ~2
+  seconds.
+- **Row counts are non-monotonic.** gcam-v6.0 returns the most rows (747k),
+  after which the 7.x land-module redesign resets the count to 653k; from there
+  it grows gradually through 9.1 (683k). This tracks GCAM's evolving land
+  representation, not `gcamreader` behavior - see the diagnostic figure and
+  tier table in the rendered docs page.
+
+> An earlier run reported `SCENARIO_FAIL` for gcam-v5.3/v5.4/v6.0 due to a
+> filesystem permission error (`tbl.basex (Permission denied)`) on the CI-owned
+> databases. After those databases were made readable, all three PASS.

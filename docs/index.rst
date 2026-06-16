@@ -12,6 +12,7 @@ pandas DataFrames.
    installation
    usage
    cli
+   verified_versions
    api
    contributing
 

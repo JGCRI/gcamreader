@@ -25,6 +25,35 @@ produced by [GCAM](https://github.com/JGCRI/gcam-core).
 
 ## Installation
 
+### Set up a virtual environment
+
+It is recommended to install `gcamreader` into an isolated virtual environment
+to avoid conflicts with other packages on your system.
+
+Using the built-in `venv` module:
+
+```bash
+# Create a virtual environment in a directory named ".venv".
+python -m venv .venv
+
+# Activate it (macOS / Linux).
+source .venv/bin/activate
+
+# Activate it (Windows PowerShell).
+.venv\Scripts\Activate.ps1
+```
+
+Alternatively, with `conda`:
+
+```bash
+conda create -n gcamreader python=3.11
+conda activate gcamreader
+```
+
+Once the environment is activated, install `gcamreader` using one of the
+methods below. To leave the environment when you are finished, run `deactivate`
+(`venv`) or `conda deactivate` (`conda`).
+
 Install the latest release from PyPI:
 
 ```bash

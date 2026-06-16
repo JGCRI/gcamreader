@@ -8,6 +8,36 @@ Requirements
 * A Java runtime (JRE). ``gcamreader`` runs queries against local databases
   using a bundled copy of the GCAM ModelInterface, which requires Java.
 
+Set up a virtual environment
+----------------------------
+
+It is recommended to install ``gcamreader`` into an isolated virtual
+environment to avoid conflicts with other packages on your system.
+
+Using the built-in ``venv`` module:
+
+.. code-block:: bash
+
+   # Create a virtual environment in a directory named ".venv".
+   python -m venv .venv
+
+   # Activate it (macOS / Linux).
+   source .venv/bin/activate
+
+   # Activate it (Windows PowerShell).
+   .venv\Scripts\Activate.ps1
+
+Alternatively, with ``conda``:
+
+.. code-block:: bash
+
+   conda create -n gcamreader python=3.11
+   conda activate gcamreader
+
+Once the environment is activated, install ``gcamreader`` using one of the
+methods below. To leave the environment when you are finished, run
+``deactivate`` (``venv``) or ``conda deactivate`` (``conda``).
+
 Install from PyPI
 -----------------
 
