@@ -192,9 +192,7 @@ class TestLocalCommand:
         db_dir.mkdir()
         (db_dir / "tbl.basex").write_text("")
 
-        monkeypatch.setattr(
-            cli, "LocalDBConn", lambda parent, name: _FakeConn()
-        )
+        monkeypatch.setattr(cli, "LocalDBConn", lambda parent, name: _FakeConn())
         called: dict[str, object] = {}
 
         def _fake_execute(

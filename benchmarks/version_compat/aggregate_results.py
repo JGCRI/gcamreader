@@ -138,8 +138,7 @@ def main() -> None:
     args = parse_args()
 
     records = [
-        json.loads(path.read_text())
-        for path in sorted(Path(args.indir).glob("*.json"))
+        json.loads(path.read_text()) for path in sorted(Path(args.indir).glob("*.json"))
     ]
     if not records:
         raise SystemExit(f"no JSON files found in {args.indir}")

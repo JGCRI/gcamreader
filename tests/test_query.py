@@ -52,7 +52,7 @@ class TestQuery:
 
     def test_missing_title_yields_none(self) -> None:
         """A query without a title attribute should have ``title`` of ``None``."""
-        xml = "<aQuery><region name=\"USA\"/></aQuery>"
+        xml = '<aQuery><region name="USA"/></aQuery>'
         query = gcamreader.Query(xml)
         assert query.title is None
 

@@ -46,9 +46,7 @@ class TestParserslt:
         assert pd.isna(forest["technology"].iloc[0])
         assert forest["value"].iloc[0] == pytest.approx(15.0)
 
-    def test_no_value_column_is_passed_through(
-        self, sample_scenario_csv: str
-    ) -> None:
+    def test_no_value_column_is_passed_through(self, sample_scenario_csv: str) -> None:
         """When there is no value column, rows should not be aggregated."""
         df = querymi._parserslt(sample_scenario_csv, warn_empty=True, title="t")
         assert df is not None
@@ -108,12 +106,8 @@ class TestLocalDBConn:
 
     def test_default_classpath_is_used(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Skipping validation should still set the default class path."""
-        monkeypatch.setattr(
-            querymi.LocalDBConn, "listScenariosInDB", lambda self: None
-        )
-        conn = gcamreader.LocalDBConn(
-            "/some/path", "db", validatedb=False
-        )
+        monkeypatch.setattr(querymi.LocalDBConn, "listScenariosInDB", lambda self: None)
+        conn = gcamreader.LocalDBConn("/some/path", "db", validatedb=False)
         assert conn.miclasspath == querymi._default_miclasspath
         assert conn.dbfile == "db"
         assert conn.maxMemory == "4g"
@@ -122,9 +116,7 @@ class TestLocalDBConn:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """A failed validation query should raise ``OSError``."""
-        monkeypatch.setattr(
-            querymi.LocalDBConn, "listScenariosInDB", lambda self: None
-        )
+        monkeypatch.setattr(querymi.LocalDBConn, "listScenariosInDB", lambda self: None)
         with pytest.raises(OSError):
             gcamreader.LocalDBConn("/some/path", "db", validatedb=True)
 
@@ -135,9 +127,7 @@ class TestLocalDBConn:
     ) -> None:
         """A successful validation should print the available scenarios."""
         scen = pd.DataFrame({"name": ["Reference", "Policy"]})
-        monkeypatch.setattr(
-            querymi.LocalDBConn, "listScenariosInDB", lambda self: scen
-        )
+        monkeypatch.setattr(querymi.LocalDBConn, "listScenariosInDB", lambda self: scen)
         gcamreader.LocalDBConn("/some/path", "db", validatedb=True)
         captured = capsys.readouterr()
         assert "Reference" in captured.out
@@ -147,9 +137,7 @@ class TestLocalDBConn:
         self, monkeypatch: pytest.MonkeyPatch, simple_query: gcamreader.Query
     ) -> None:
         """runQuery should call the model interface and parse the result."""
-        monkeypatch.setattr(
-            querymi.LocalDBConn, "listScenariosInDB", lambda self: None
-        )
+        monkeypatch.setattr(querymi.LocalDBConn, "listScenariosInDB", lambda self: None)
         conn = gcamreader.LocalDBConn("/some/path", "db", validatedb=False)
 
         captured_cmd: dict[str, list[str]] = {}
@@ -168,9 +156,7 @@ class TestLocalDBConn:
         self, monkeypatch: pytest.MonkeyPatch, simple_query: gcamreader.Query
     ) -> None:
         """An explicit regions argument should reach the query file content."""
-        monkeypatch.setattr(
-            querymi.LocalDBConn, "listScenariosInDB", lambda self: None
-        )
+        monkeypatch.setattr(querymi.LocalDBConn, "listScenariosInDB", lambda self: None)
         conn = gcamreader.LocalDBConn("/some/path", "db", validatedb=False)
 
         written: dict[str, str] = {}
@@ -188,9 +174,7 @@ class TestLocalDBConn:
         assert real_runmi_called["value"]
         assert "('China')" in written["content"]
 
-    def test_listscenarios_adds_fqname(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_listscenarios_adds_fqname(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """listScenariosInDB should append a fully qualified name column."""
         monkeypatch.setattr(
             querymi,
@@ -223,9 +207,7 @@ class _FakeResponse:
 class TestRemoteDBConn:
     """Tests for :class:`gcamreader.RemoteDBConn` orchestration logic."""
 
-    def test_validation_failure_raises(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_validation_failure_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """A failed validation should raise an exception."""
         monkeypatch.setattr(
             querymi.RemoteDBConn, "listScenariosInDB", lambda self: None
@@ -274,16 +256,12 @@ class TestRemoteDBConn:
         with pytest.raises(RuntimeError):
             conn.runQuery(simple_query)
 
-    def test_listscenarios_adds_fqname(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_listscenarios_adds_fqname(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """listScenariosInDB should append a fully qualified name column."""
         conn = gcamreader.RemoteDBConn("db", "user", "pw", validatedb=False)
         monkeypatch.setattr(
             "requests.post",
-            lambda url, auth, data: _FakeResponse(
-                "name,date\nReference,2020-1-1\n"
-            ),
+            lambda url, auth, data: _FakeResponse("name,date\nReference,2020-1-1\n"),
         )
         scen = conn.listScenariosInDB()
         assert scen is not None
@@ -293,9 +271,7 @@ class TestRemoteDBConn:
 class TestImportdata:
     """Tests for the :func:`gcamreader.importdata` convenience function."""
 
-    def test_uses_existing_connection(
-        self, simple_query: gcamreader.Query
-    ) -> None:
+    def test_uses_existing_connection(self, simple_query: gcamreader.Query) -> None:
         """A provided connection should be used to run each query."""
 
         class _FakeConn:
