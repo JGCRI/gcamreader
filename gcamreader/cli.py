@@ -3,6 +3,24 @@
 This module exposes a :mod:`typer` application with ``local`` and ``remote``
 subcommands that run the queries contained in a GCAM queries XML file and save
 the results as pipe-delimited CSV files.
+
+Examples:
+    Query a local database from the shell::
+
+        $ python -m gcamreader local \\
+            -d /path/to/database_basexdb \\
+            -q Main_queries.xml \\
+            -o ./outputs
+
+    Query a remote BaseX server::
+
+        $ python -m gcamreader remote \\
+            -u username \\
+            -d database_name \\
+            -q Main_queries.xml \\
+            -o ./outputs \\
+            -n localhost \\
+            -p 8984
 """
 
 from __future__ import annotations
@@ -108,6 +126,14 @@ def local(
         query_path: Path to the queries XML file to run.
         output_path: Directory in which the result CSV files are created.
         force: Whether to overwrite existing CSV files in the output path.
+
+    Examples:
+        Invoke from the shell::
+
+            $ python -m gcamreader local \\
+                -d /path/to/database_basexdb \\
+                -q Main_queries.xml \\
+                -o ./outputs
     """
     typer.echo(f"opening: {database_path.absolute()}", err=True)
     if not list(database_path.glob("*.basex")):
@@ -207,6 +233,17 @@ def remote(
         hostname: Hostname of the remote server.
         port: Port on the remote server.
         force: Whether to overwrite existing CSV files in the output path.
+
+    Examples:
+        Invoke from the shell::
+
+            $ python -m gcamreader remote \\
+                -u username \\
+                -d database_name \\
+                -q Main_queries.xml \\
+                -o ./outputs \\
+                -n localhost \\
+                -p 8984
     """
     # Establish database connection - uses ModelInterface.jar.
     conn = RemoteDBConn(

@@ -32,6 +32,21 @@ class Query:
         regions: List of region names parsed from the query, or ``None`` when
             the query does not specify regions.
         title: The query title.
+
+    Examples:
+        Build a query directly from an XML string::
+
+            >>> import gcamreader
+            >>> xml = (
+            ...     '<supplyDemandQuery title="CO2 emissions">'
+            ...     '<region name="USA"/>'
+            ...     '</supplyDemandQuery>'
+            ... )
+            >>> query = gcamreader.Query(xml)
+            >>> query.title
+            'CO2 emissions'
+            >>> query.regions
+            ['USA']
     """
 
     def __init__(self, xmlin: str | ET._Element) -> None:
@@ -40,6 +55,14 @@ class Query:
         Args:
             xmlin: XML query definition. This can be either a string containing
                 the query XML or an already parsed lxml element.
+
+        Examples:
+            >>> import gcamreader
+            >>> query = gcamreader.Query(
+            ...     '<aQuery title="Population"><region name="China"/></aQuery>'
+            ... )
+            >>> query.title
+            'Population'
         """
         if isinstance(xmlin, str):
             parser = ET.XMLParser(strip_cdata=False)
@@ -66,6 +89,20 @@ def parse_batch_query(filename: str) -> list[Query]:
 
     Returns:
         A list of :class:`Query` objects, one per ``title`` element found.
+
+    Examples:
+        Parse the sample land-allocation query bundled with the package::
+
+            >>> import os
+            >>> import gcamreader
+            >>> query_file = os.path.join(
+            ...     gcamreader.sample_data_dir(),
+            ...     "queries",
+            ...     "query_land_reg32_basin235_gcam5p0.xml",
+            ... )
+            >>> queries = gcamreader.parse_batch_query(query_file)
+            >>> queries[0].title
+            'Crop Land Allocation'
     """
     parser = ET.XMLParser(strip_cdata=False)
     root = ET.parse(filename, parser)
@@ -93,6 +130,13 @@ def sample_data_dir() -> str:
 
     Returns:
         The absolute path to the ``data`` package data directory.
+
+    Examples:
+        >>> import os
+        >>> import gcamreader
+        >>> data_dir = gcamreader.sample_data_dir()
+        >>> os.path.isdir(data_dir)
+        True
     """
     return str(resources.files("gcamreader") / "data")
 
@@ -211,6 +255,25 @@ class LocalDBConn:
         suppress_gabble: Whether to suppress model interface console output.
         maxMemory: Maximum memory passed to the Java runtime.
         miclasspath: Java class path for the GCAM model interface.
+
+    Examples:
+        Open the bundled sample database and run a query (requires a Java
+        runtime)::
+
+            >>> import os
+            >>> import gcamreader
+            >>> data_dir = gcamreader.sample_data_dir()
+            >>> conn = gcamreader.LocalDBConn(  # doctest: +SKIP
+            ...     data_dir, "sample_basexdb"
+            ... )
+            >>> query = gcamreader.parse_batch_query(  # doctest: +SKIP
+            ...     os.path.join(
+            ...         data_dir,
+            ...         "queries",
+            ...         "query_land_reg32_basin235_gcam5p0.xml",
+            ...     )
+            ... )[0]
+            >>> df = conn.runQuery(query)  # doctest: +SKIP
     """
 
     def __init__(
@@ -296,6 +359,16 @@ class LocalDBConn:
         Returns:
             A DataFrame of the query results, or ``None`` if the result was
             empty.
+
+        Examples:
+            >>> import gcamreader  # doctest: +SKIP
+            >>> conn = gcamreader.LocalDBConn(dbpath, dbfile)  # doctest: +SKIP
+            >>> query = gcamreader.parse_batch_query(  # doctest: +SKIP
+            ...     "queries.xml"
+            ... )[0]
+            >>> df = conn.runQuery(  # doctest: +SKIP
+            ...     query, scenarios=["Reference"], regions=["USA"]
+            ... )
         """
         # Convert region and scenario lists to strings of the form
         # ('item1', 'item2', ..., 'itemN').
@@ -362,6 +435,13 @@ class LocalDBConn:
         Returns:
             A DataFrame of scenarios, or ``None`` if the query returned no
             results.
+
+        Examples:
+            >>> import gcamreader  # doctest: +SKIP
+            >>> conn = gcamreader.LocalDBConn(dbpath, dbfile)  # doctest: +SKIP
+            >>> scenarios = conn.listScenariosInDB()  # doctest: +SKIP
+            >>> list(scenarios["name"])  # doctest: +SKIP
+            ['Reference']
         """
         querystr = (
             "let $scns := collection()/scenario return document{ element csv { "
@@ -407,6 +487,22 @@ class RemoteDBConn:
         password: The password configured for the BaseX server.
         address: The server address (URL).
         port: The port the server is running on.
+
+    Examples:
+        Connect to a BaseX server and run a query (requires a running server)::
+
+            >>> import gcamreader
+            >>> conn = gcamreader.RemoteDBConn(  # doctest: +SKIP
+            ...     dbfile="my_database",
+            ...     username="user",
+            ...     password="secret",
+            ...     address="localhost",
+            ...     port=8984,
+            ... )
+            >>> query = gcamreader.parse_batch_query(  # doctest: +SKIP
+            ...     "queries.xml"
+            ... )[0]
+            >>> df = conn.runQuery(query)  # doctest: +SKIP
     """
 
     def __init__(
@@ -488,6 +584,16 @@ class RemoteDBConn:
         Returns:
             A DataFrame of the query results, or ``None`` if the result was
             empty.
+
+        Examples:
+            >>> import gcamreader  # doctest: +SKIP
+            >>> conn = gcamreader.RemoteDBConn(  # doctest: +SKIP
+            ...     "my_database", "user", "secret"
+            ... )
+            >>> query = gcamreader.parse_batch_query(  # doctest: +SKIP
+            ...     "queries.xml"
+            ... )[0]
+            >>> df = conn.runQuery(query, regions=["USA"])  # doctest: +SKIP
         """
         from requests import post
 
@@ -542,6 +648,15 @@ class RemoteDBConn:
         Returns:
             A DataFrame of scenarios, or ``None`` if the query returned no
             results.
+
+        Examples:
+            >>> import gcamreader  # doctest: +SKIP
+            >>> conn = gcamreader.RemoteDBConn(  # doctest: +SKIP
+            ...     "my_database", "user", "secret"
+            ... )
+            >>> scenarios = conn.listScenariosInDB()  # doctest: +SKIP
+            >>> list(scenarios["name"])  # doctest: +SKIP
+            ['Reference']
         """
         from requests import post
 
@@ -607,6 +722,25 @@ def importdata(
     Returns:
         A dictionary mapping each query title to its result DataFrame (or
         ``None`` for empty results).
+
+    Examples:
+        Run every query in a batch file against a local database and access a
+        result by its title (requires a Java runtime)::
+
+            >>> import gcamreader  # doctest: +SKIP
+            >>> results = gcamreader.importdata(  # doctest: +SKIP
+            ...     "/path/to/database_basexdb",
+            ...     "queries.xml",
+            ...     scenarios=["Reference"],
+            ... )
+            >>> results["Crop Land Allocation"].head()  # doctest: +SKIP
+
+        A previously created connection may be passed instead of a filename::
+
+            >>> conn = gcamreader.LocalDBConn(dbpath, dbfile)  # doctest: +SKIP
+            >>> results = gcamreader.importdata(  # doctest: +SKIP
+            ...     conn, "queries.xml"
+            ... )
     """
     if isinstance(dbspec, str):
         dbdir = path.dirname(dbspec)
