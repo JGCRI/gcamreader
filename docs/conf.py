@@ -41,7 +41,7 @@ html_static_path = ["_static"]
 # visible against either sidebar background.
 html_theme_options = {
     "sidebar_hide_name": True,
-    "light_logo": "gcamreader-logo-transparent.png",
+    "light_logo": "gcamreader-logo-white.png",
     "dark_logo": "gcamreader-logo-white.png",
 }
 
