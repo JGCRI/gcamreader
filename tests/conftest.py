@@ -58,3 +58,73 @@ def connection() -> gcamreader.LocalDBConn:
         An initialized :class:`gcamreader.LocalDBConn`.
     """
     return gcamreader.LocalDBConn(str(DATA_DIR), SAMPLE_DB_NAME, suppress_gabble=True)
+
+
+# A minimal CSV payload that mimics the output of the model interface for a
+# query that contains a "value" column (and therefore triggers aggregation).
+SAMPLE_RESULT_CSV = (
+    "scenario,region,land-allocation,Year,value\n"
+    "Reference,USA,Forest,2010,10.0\n"
+    "Reference,USA,Forest,2010,5.0\n"
+    "Reference,USA,Crops,2010,3.0\n"
+)
+
+# A CSV payload that lists scenarios (no "value" column, so no aggregation).
+SAMPLE_SCENARIO_CSV = "name,date,version\nReference,2020-1-1,gcam-v7.0\n"
+
+
+@pytest.fixture
+def sample_result_csv() -> str:
+    """Return a CSV string mimicking an aggregatable query result.
+
+    Returns:
+        A CSV payload containing a ``value`` column with duplicate rows.
+    """
+    return SAMPLE_RESULT_CSV
+
+
+@pytest.fixture
+def sample_scenario_csv() -> str:
+    """Return a CSV string mimicking a scenario listing result.
+
+    Returns:
+        A CSV payload without a ``value`` column.
+    """
+    return SAMPLE_SCENARIO_CSV
+
+
+@pytest.fixture
+def land_query(land_query_path: Path) -> gcamreader.Query:
+    """Return the parsed bundled land-allocation query.
+
+    Returns:
+        The first :class:`gcamreader.Query` parsed from the bundled file.
+    """
+    return gcamreader.parse_batch_query(str(land_query_path))[0]
+
+
+@pytest.fixture
+def simple_query() -> gcamreader.Query:
+    """Return a small :class:`gcamreader.Query` built from an XML string.
+
+    Returns:
+        A query with a title and a single region.
+    """
+    xml = (
+        '<supplyDemandQuery title="CO2 emissions">'
+        '<region name="USA"/>'
+        "</supplyDemandQuery>"
+    )
+    return gcamreader.Query(xml)
+
+
+@pytest.fixture
+def output_dir(tmp_path: Path) -> Path:
+    """Return a temporary directory for CLI/output tests.
+
+    Returns:
+        A writable temporary directory path.
+    """
+    out = tmp_path / "outputs"
+    out.mkdir()
+    return out
