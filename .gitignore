@@ -4,6 +4,9 @@
 # development plans
 plans/
 
+# local files
+.local/
+
 # pycharm
 .idea
 
