@@ -1,0 +1,95 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gcamreader"
+dynamic = ["version"]
+description = "Tools for importing GCAM output data"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "BSD-2-Clause" }
+authors = [
+    { name = "Robert Link" },
+    { name = "Chris R. Vernon", email = "chris.vernon@pnnl.gov" },
+    { name = "Pralit Patel", email = "pralit.patel@pnnl.gov" },
+]
+maintainers = [
+    { name = "Chris R. Vernon", email = "chris.vernon@pnnl.gov" },
+    { name = "Pralit Patel", email = "pralit.patel@pnnl.gov" },
+]
+keywords = ["gcam", "energy", "land", "water", "climate", "xml", "basex"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "requests>=2.31",
+    "pandas>=2.0",
+    "lxml>=5.0",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "black>=24.0",
+    "build>=1.2",
+]
+docs = [
+    "sphinx>=7.0",
+    "furo>=2024.1.29",
+    "myst-parser>=3.0",
+    "sphinx-autodoc-typehints>=2.0",
+]
+
+[project.scripts]
+gcamreader = "gcamreader.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/JGCRI/gcamreader"
+Documentation = "https://jgcri.github.io/gcamreader/"
+Source = "https://github.com/JGCRI/gcamreader"
+Issues = "https://github.com/JGCRI/gcamreader/issues"
+
+[tool.setuptools.dynamic]
+version = { attr = "gcamreader.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["gcamreader*"]
+exclude = ["tests*", "notebooks*", "benchmarks*"]
+
+[tool.setuptools.package-data]
+gcamreader = [
+    "ModelInterface/**/*",
+    "data/**/*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "benchmarks"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py311", "py312", "py313"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+extend-exclude = ["*.ipynb", "docs/_build"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# Line length is enforced by black, which permits occasional overflow.
+ignore = ["E501"]

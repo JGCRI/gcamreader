@@ -1,136 +1,251 @@
-from pathlib import Path
-from .querymi import LocalDBConn, RemoteDBConn, parse_batch_query
-import click
-from click_default_group import DefaultGroup
-import sys
-import subprocess
+"""Command line interface for running queries against GCAM databases.
+
+This module exposes a :mod:`typer` application with ``local`` and ``remote``
+subcommands that run the queries contained in a GCAM queries XML file and save
+the results as pipe-delimited CSV files.
+
+Examples:
+    Query a local database from the shell::
+
+        $ python -m gcamreader local \\
+            -d /path/to/database_basexdb \\
+            -q Main_queries.xml \\
+            -o ./outputs
+
+    Query a remote BaseX server::
+
+        $ python -m gcamreader remote \\
+            -u username \\
+            -d database_name \\
+            -q Main_queries.xml \\
+            -o ./outputs \\
+            -n localhost \\
+            -p 8984
+"""
+
+from __future__ import annotations
+
 import multiprocessing
+import subprocess
+from pathlib import Path
+from typing import Annotated
 
+import typer
 
-@click.group(
-    cls=DefaultGroup,
-    default="local",
-    default_if_no_args=True,
+from . import __version__
+from .querymi import LocalDBConn, RemoteDBConn, parse_batch_query
+
+app = typer.Typer(
+    help="Run queries against a GCAM scenario database and save outputs as CSV.",
+    add_completion=False,
+    no_args_is_help=True,
 )
-@click.version_option()
-def cli():
+
+
+def _version_callback(value: bool) -> None:
+    """Print the package version and exit when ``--version`` is given.
+
+    Args:
+        value: Whether the ``--version`` flag was supplied.
+
+    Raises:
+        typer.Exit: Always raised after printing when ``value`` is ``True``.
     """
-    Run queries against a gcam scenario database.
-
-        Saves outputs as .csv
-
-    Documentation: https://github.com/JGCRI/gcamreader/
-    """
+    if value:
+        typer.echo(f"gcamreader {__version__}")
+        raise typer.Exit()
 
 
-@cli.command(name="local")
-@click.option(
-    "-d",
-    "--database_path",
-    type=click.Path(exists=True, file_okay=False, readable=True, path_type=Path),
-    required=True,
-    help="path to database file (i.e. parent of *.basex dir)",
-)
-@click.option(
-    "-q",
-    "--query_path",
-    type=click.Path(exists=True, dir_okay=False, readable=True, path_type=Path),
-    required=True,
-    help="path to xml with queries to run (i.e: Main_queries.xml)",
-)
-@click.option(
-    "-o",
-    "--output_path",
-    type=click.Path(exists=True, file_okay=False, writable=True, path_type=Path),
-    help="path to output (i.e. where .csv files should be created)",
-)
-@click.option("-f", "--force", type=bool, default=False, help="overwrite existing .csv in output path")
-def local(database_path: Path, query_path: Path, output_path: Path, force: bool):
-    """
-    query gcam scenario databases
+@app.callback()
+def main(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            help="Show the gcamreader version and exit.",
+            callback=_version_callback,
+            is_eager=True,
+        ),
+    ] = False,
+) -> None:
+    """Run queries against a GCAM scenario database.
+
+    Args:
+        version: When ``True``, print the version and exit.
     """
 
-    click.echo(f"opening: {database_path.absolute()}", err=True)
+
+@app.command()
+def local(
+    database_path: Annotated[
+        Path,
+        typer.Option(
+            "-d",
+            "--database_path",
+            exists=True,
+            file_okay=False,
+            readable=True,
+            help="path to database file (i.e. parent of *.basex dir)",
+        ),
+    ],
+    query_path: Annotated[
+        Path,
+        typer.Option(
+            "-q",
+            "--query_path",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            help="path to xml with queries to run (i.e: Main_queries.xml)",
+        ),
+    ],
+    output_path: Annotated[
+        Path,
+        typer.Option(
+            "-o",
+            "--output_path",
+            file_okay=False,
+            writable=True,
+            help="path to output (i.e. where .csv files should be created)",
+        ),
+    ],
+    force: Annotated[
+        bool,
+        typer.Option(
+            "-f",
+            "--force",
+            help="overwrite existing .csv in output path",
+        ),
+    ] = False,
+) -> None:
+    """Query a local GCAM scenario database.
+
+    Args:
+        database_path: Path to the database directory (parent of the ``*.basex``
+            directory).
+        query_path: Path to the queries XML file to run.
+        output_path: Directory in which the result CSV files are created.
+        force: Whether to overwrite existing CSV files in the output path.
+
+    Examples:
+        Invoke from the shell::
+
+            $ python -m gcamreader local \\
+                -d /path/to/database_basexdb \\
+                -q Main_queries.xml \\
+                -o ./outputs
+    """
+    typer.echo(f"opening: {database_path.absolute()}", err=True)
     if not list(database_path.glob("*.basex")):
-        click.echo(f"basex files missing: {database_path}", err=True)
-        return False
+        typer.echo(f"basex files missing: {database_path}", err=True)
+        raise typer.Exit(code=1)
     parent = str(database_path.parent)
     name = database_path.name
 
-    # establish database connection - uses ModelInterface.jar
+    # Establish database connection - uses ModelInterface.jar.
     conn = LocalDBConn(parent, name)
 
     execute(conn, query_path, output_path, force)
 
 
-@cli.command(name="remote")
-@click.option(
-    "-u",
-    "--username",
-    type=str,
-    required=True,
-    help="username of remote server authentication",
-)
-@click.option(
-    "-w",
-    "--password",
-    type=str,
-    prompt=True,
-    hide_input=True,
-    help="password of remote server authentication",
-)
-@click.option(
-    "-n",
-    "--hostname",
-    type=str,
-    default="localhost",
-    required=True,
-    help="hostname of remote server",
-)
-@click.option(
-    "-p",
-    "--port",
-    type=int,
-    default=8984,
-    required=True,
-    help="port on remote server",
-)
-@click.option(
-    "-d",
-    "--database_name",
-    type=str,
-    required=True,
-    help="name of database to query (i.e. parent of *.basex dir)",
-)
-@click.option(
-    "-q",
-    "--query_path",
-    type=click.Path(exists=True, dir_okay=False, readable=True, path_type=Path),
-    required=True,
-    help="path to xml with queries to run (i.e: Main_queries.xml)",
-)
-@click.option(
-    "-o",
-    "--output_path",
-    type=click.Path(exists=True, file_okay=False, writable=True, path_type=Path),
-    help="path to output (i.e. where .csv files should be created)",
-)
-@click.option("-f", "--force", type=bool, default=False, help="overwrite existing .csv in output path")
+@app.command()
 def remote(
-    username: str,
-    password: str,
-    hostname: str,
-    port: int,
-    database_name: str,
-    query_path: Path,
-    output_path: Path,
-    force: bool
-):
-    """
-    query a remote server containing gcam scenario databases
-    """
+    username: Annotated[
+        str,
+        typer.Option(
+            "-u",
+            "--username",
+            help="username of remote server authentication",
+        ),
+    ],
+    database_name: Annotated[
+        str,
+        typer.Option(
+            "-d",
+            "--database_name",
+            help="name of database to query (i.e. parent of *.basex dir)",
+        ),
+    ],
+    query_path: Annotated[
+        Path,
+        typer.Option(
+            "-q",
+            "--query_path",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            help="path to xml with queries to run (i.e: Main_queries.xml)",
+        ),
+    ],
+    output_path: Annotated[
+        Path,
+        typer.Option(
+            "-o",
+            "--output_path",
+            file_okay=False,
+            writable=True,
+            help="path to output (i.e. where .csv files should be created)",
+        ),
+    ],
+    password: Annotated[
+        str,
+        typer.Option(
+            "-w",
+            "--password",
+            prompt=True,
+            hide_input=True,
+            help="password of remote server authentication",
+        ),
+    ],
+    hostname: Annotated[
+        str,
+        typer.Option(
+            "-n",
+            "--hostname",
+            help="hostname of remote server",
+        ),
+    ] = "localhost",
+    port: Annotated[
+        int,
+        typer.Option(
+            "-p",
+            "--port",
+            help="port on remote server",
+        ),
+    ] = 8984,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "-f",
+            "--force",
+            help="overwrite existing .csv in output path",
+        ),
+    ] = False,
+) -> None:
+    """Query a remote server containing GCAM scenario databases.
 
-    # establish database connection - uses ModelInterface.jar
+    Args:
+        username: Username for remote server authentication.
+        database_name: Name of the database to query.
+        query_path: Path to the queries XML file to run.
+        output_path: Directory in which the result CSV files are created.
+        password: Password for remote server authentication.
+        hostname: Hostname of the remote server.
+        port: Port on the remote server.
+        force: Whether to overwrite existing CSV files in the output path.
+
+    Examples:
+        Invoke from the shell::
+
+            $ python -m gcamreader remote \\
+                -u username \\
+                -d database_name \\
+                -q Main_queries.xml \\
+                -o ./outputs \\
+                -n localhost \\
+                -p 8984
+    """
+    # Establish database connection - uses ModelInterface.jar.
     conn = RemoteDBConn(
         username=username,
         password=password,
@@ -142,39 +257,67 @@ def remote(
     execute(conn, query_path, output_path, force)
 
 
-def save(data):
-    conn, query, save_to, force = map(data.get, ["conn", "query", "save_to", "force"])
+def save(data: dict) -> None:
+    """Run a single query and save its result to CSV.
+
+    Args:
+        data: A dictionary with keys ``conn``, ``query``, ``save_to``, and
+            ``force`` describing the query to run and where to write it.
+    """
+    conn, query, save_to, force = (
+        data["conn"],
+        data["query"],
+        data["save_to"],
+        data["force"],
+    )
     if save_to.exists():
-        click.echo(f"output exists: {save_to.name}", err=True)
+        typer.echo(f"output exists: {save_to.name}", err=True)
         if not force:
-            click.echo(f"skipping: {save_to.name}", err=True)
+            typer.echo(f"skipping: {save_to.name}", err=True)
             return
-    click.echo(f"running: {query.title}", err=True)
+    typer.echo(f"running: {query.title}", err=True)
     try:
         df = conn.runQuery(query)
-    except subprocess.CalledProcessError as e:
-        click.echo(f"failed: {query.title}", err=True)
+    except subprocess.CalledProcessError:
+        typer.echo(f"failed: {query.title}", err=True)
         return
     if df is None:
-        click.echo(f"empty: {query.title}", err=True)
+        typer.echo(f"empty: {query.title}", err=True)
         return
     df.to_csv(save_to, index=False, sep="|")
-    click.echo(f"saved: {save_to.absolute()}", err=True)
+    typer.echo(f"saved: {save_to.absolute()}", err=True)
 
 
-def execute(conn, query_path: Path, output_path: Path, force: bool):
-    # parse query xml
-    click.echo(f"parsing: {query_path.name}", err=True)
+def execute(
+    conn: LocalDBConn | RemoteDBConn,
+    query_path: Path,
+    output_path: Path,
+    force: bool,
+) -> None:
+    """Parse a queries file and run all queries, saving each result to CSV.
+
+    Args:
+        conn: The database connection to run the queries against.
+        query_path: Path to the queries XML file.
+        output_path: Directory in which the result CSV files are created.
+        force: Whether to overwrite existing CSV files in the output path.
+    """
+    # Parse query xml.
+    typer.echo(f"parsing: {query_path.name}", err=True)
     queries = []
     for query in parse_batch_query(str(query_path)):
-        data = {}
-        data["conn"] = conn
-        data["query"] = query
-        data["save_to"] = (
-            output_path / f"{str(query.title).replace(' ', '_').lower()}.csv"
-        )
-        data["force"] = force
+        data = {
+            "conn": conn,
+            "query": query,
+            "save_to": output_path
+            / f"{str(query.title).replace(' ', '_').lower()}.csv",
+            "force": force,
+        }
         queries.append(data)
     with multiprocessing.Pool() as pool:
         pool.map(save, queries)
-    click.echo(f"extract complete", err=True)
+    typer.echo("extract complete", err=True)
+
+
+if __name__ == "__main__":
+    app()

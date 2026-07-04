@@ -1,0 +1,11 @@
+{
+  "count": 1,
+  "queries": [
+    {
+      "querystr": "<query title=\"Crop Land Allocation\">\n         <axis1 name=\"land-allocation\">LandLeaf</axis1>\n         <axis2 name=\"Year\">land-allocation[@year]</axis2>\n         <xPath buildList=\"true\" dataName=\"land-allocation\" group=\"false\" sumAll=\"false\">/LandNode[@name='root' or @type='LandNode' (: collapse :)]//land-allocation/text()</xPath>\n         <comments/>\n      </query>\n    ",
+      "regions": null,
+      "title": "Crop Land Allocation"
+    }
+  ],
+  "source": "query_land_reg32_basin235_gcam5p0.xml"
+}

@@ -1,0 +1,32 @@
+{
+  "basex_dir": "database_basexdbGCAM",
+  "db_parent": "/rcfs/projects/GCAM/gcam-ci-run/gcam-v7.2/output",
+  "errors": {},
+  "gcamreader_version": "1.5.0",
+  "generated_at": "2026-06-16T14:14:00.746065+00:00",
+  "java_version": "openjdk version \"17.0.18\" 2026-01-20\nOpenJDK Runtime Environment Temurin-17.0.18+8 (build 17.0.18+8)\nOpenJDK 64-Bit Server VM Temurin-17.0.18+8 (build 17.0.18+8, mixed mode, sharing)",
+  "max_memory": "16g",
+  "platform": "Linux-5.14.0-503.26.1.el9_5.x86_64-x86_64-with-glibc2.34",
+  "python_version": "3.13.5",
+  "query_cols": [
+    "Units",
+    "scenario",
+    "region",
+    "land-allocation",
+    "Year",
+    "value"
+  ],
+  "query_file": "/people/d3y010/repos/github/gcamreader/benchmarks/version_compat/queries/land_allocation.xml",
+  "query_rows": 672408,
+  "scenario_count": 1,
+  "scenarios": [
+    "GCAM"
+  ],
+  "status": "PASS",
+  "timings_sec": {
+    "connect": 0.0,
+    "list_scenarios": 0.908,
+    "run_query": 53.0262
+  },
+  "version": "gcam-v7.2"
+}
