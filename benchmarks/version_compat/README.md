@@ -2,8 +2,8 @@
 
 This directory verifies that `gcamreader` works against GCAM output databases
 produced by every available GCAM version (5.3 through 9.1), and captures
-per-version performance figures. It is designed to run on the **deception** HPC
-cluster under Slurm, after which its outputs are committed here as documentation.
+per-version performance figures. It is designed to run on an HPC cluster under
+Slurm, after which its outputs are committed here as documentation.
 
 The full design rationale lives in
 [`plans/gcam-version-verification.md`](../../plans/gcam-version-verification.md).
@@ -39,7 +39,7 @@ Each version's database lives at:
     atv.basex  inf.basex  tbl.basex  tbli.basex  txt.basex  txtl.basex  txtr.basex
 ```
 
-## Usage on deception
+## Usage on an HPC cluster
 
 ```bash
 # 1. Sync this repo to the cluster (or git pull there).
@@ -47,7 +47,7 @@ cd $HOME/repos/github/gcamreader
 
 # 2. Sanity-check a single version interactively first.
 module purge && module load python/3.13.5 java/17.0.18
-source /people/d3y010/envs/gcamreader/bin/activate
+source $HOME/envs/gcamreader/bin/activate
 python benchmarks/version_compat/run_version_check.py \
   --version gcam-v8.2 \
   --db-root /rcfs/projects/GCAM/gcam-ci-run \
@@ -64,7 +64,8 @@ python benchmarks/version_compat/aggregate_results.py \
 ```
 
 The harness and Slurm script require a Java runtime (`java/17.0.18`) and access
-to the GCAM database filesystem. Both are present on deception via Lmod.
+to the GCAM database filesystem. Both are typically provided on an HPC cluster
+via Lmod.
 
 ## Status code reference
 
@@ -82,8 +83,8 @@ where the bundled queries diverge from a given GCAM schema.
 
 ## Latest results
 
-The committed run (`gcamreader 1.5.0`, Python 3.13.5, Java 17.0.18 on
-deception) verified **all 22 of 22** versions as `PASS`. See
+The committed run (`gcamreader 1.5.0`, Python 3.13.5, Java 17.0.18 on an HPC
+cluster) verified **all 22 of 22** versions as `PASS`. See
 [`results/VERIFIED_VERSIONS.md`](results/VERIFIED_VERSIONS.md) for the full
 matrix and [`docs/verified_versions.rst`](../../docs/verified_versions.rst) for
 the rendered documentation page.

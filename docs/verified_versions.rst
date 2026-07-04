@@ -8,8 +8,8 @@ per-version performance figures.
 
 .. note::
 
-   These results were produced on the PNNL **deception** HPC cluster using the
-   harness in ``benchmarks/version_compat/``. To regenerate them, see the
+   These results were produced on an HPC cluster using the harness in
+   ``benchmarks/version_compat/``. To regenerate them, see the
    :ref:`reproducing` section below.
 
 Test environment
@@ -176,9 +176,9 @@ The complete harness, Slurm job, and raw results live under
 * ``results/`` — the committed raw outputs, including per-version JSON and the
   Slurm logs for each task.
 
-The steps below reproduce the full study from scratch on the **deception**
-cluster. Adjust the module names, paths, and Slurm account/partition for your
-own system as needed.
+The steps below reproduce the full study from scratch on an HPC cluster.
+Adjust the module names, paths, and Slurm account/partition for your own
+system as needed.
 
 1. **Clone the repository.** Pick a location on a filesystem your compute nodes
    can read (e.g. your home or project space) and clone the project there.
@@ -207,8 +207,8 @@ own system as needed.
 
    .. code-block:: bash
 
-      python3 -m venv /people/$USER/envs/gcamreader
-      source /people/$USER/envs/gcamreader/bin/activate
+      python3 -m venv $HOME/envs/gcamreader
+      source $HOME/envs/gcamreader/bin/activate
       python -m pip install --upgrade pip
 
 4. **Install gcamreader into the environment.** Installing it (rather than
