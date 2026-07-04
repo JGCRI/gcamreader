@@ -15,6 +15,7 @@ module purge
 module load python/3.13.5
 module load java/17.0.18
 
+# !! NOTE:  Change the path to your virtual environment that contains gcamreader
 # Activate the virtual environment that contains gcamreader
 source /people/d3y010/envs/gcamreader/bin/activate
 
