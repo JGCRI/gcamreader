@@ -438,7 +438,8 @@ class ComparisonResult:
 
     Attributes:
         package_version: ``gcamreader.__version__`` that produced the result.
-        inputs: All inputs in report order; ``inputs[0]`` is the baseline.
+        inputs: All inputs in the order given by the caller, numbered from 1;
+            ``baseline`` names the baseline among them.
         baseline: Index (1-based) of the baseline input.
         comparisons: One entry per candidate, in input order.
         matrix: Union of differences across all comparisons.

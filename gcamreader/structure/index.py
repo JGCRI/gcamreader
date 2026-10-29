@@ -336,10 +336,18 @@ class StructureIndex:
             raise StructureIndexError(f"structure index not found: {path}")
         try:
             conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        except sqlite3.DatabaseError as exc:
+            raise StructureIndexError(
+                f"{path} is not a structure index ({exc})"
+            ) from exc
+        try:
             for pragma in _PRAGMAS_READ:
                 conn.execute(pragma)
             rows = conn.execute("SELECT key, value FROM meta_info").fetchall()
         except sqlite3.DatabaseError as exc:
+            # Close before raising: an open handle would block replacing the
+            # file on Windows.
+            conn.close()
             raise StructureIndexError(
                 f"{path} is not a structure index ({exc})"
             ) from exc

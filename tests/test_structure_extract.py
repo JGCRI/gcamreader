@@ -590,3 +590,13 @@ def test_fingerprints_are_stable_across_versions(tmp_path: Path) -> None:
         ]
         assert leaf.fingerprint == (1816970806, 3728485788, 3758961048, 3968415349)
         assert extract.EXTRACTOR_VERSION == 1
+
+
+def test_open_rejecting_a_bogus_file_releases_the_handle(tmp_path: Path) -> None:
+    bogus = tmp_path / "bogus.sqlite"
+    bogus.write_bytes(b"not a database at all, definitely longer than a header")
+    with pytest.raises(StructureIndexError):
+        StructureIndex.open(str(bogus))
+    # On Windows an unreleased handle would make this fail with PermissionError.
+    bogus.unlink()
+    assert not bogus.exists()
