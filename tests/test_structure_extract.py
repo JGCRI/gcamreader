@@ -573,3 +573,20 @@ def test_scratch_file_is_removed(tmp_path: Path) -> None:
     writer.abort()
     assert not Path(writer.raw_path).exists()
     assert not Path(writer.path).exists()
+
+
+def test_fingerprints_are_stable_across_versions(tmp_path: Path) -> None:
+    """Golden values: indexes built by different gcamreader builds must agree.
+
+    If this test fails because hashing changed on purpose, bump
+    ``extract.EXTRACTOR_VERSION`` so old indexes are refused, then update the
+    values. A silent change would make every subtree look different.
+    """
+    with build(SAMPLE, tmp_path) as index:
+        root = index.root()
+        assert root.fingerprint == (1867362366, 664266131, 2209310271, 1947907155)
+        (leaf,) = [
+            r for r in index.children(root.path_hash) if r.tag == "model-version"
+        ]
+        assert leaf.fingerprint == (1816970806, 3728485788, 3758961048, 3968415349)
+        assert extract.EXTRACTOR_VERSION == 1

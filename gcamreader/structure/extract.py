@@ -401,8 +401,8 @@ REQUIRED_DB_FILES = ("inf.basex", "tbl.basex")
 #: hold characters that are invalid in XML, so control characters are out.
 #: Tab and newline are safe: XML attribute-value normalization turns them
 #: into spaces, so no stored @name or @date can contain them.
-_RECORD_SEP = "\n"
-_FIELD_SEP = "\t"
+_LIST_RECORD_SEP = "\n"
+_LIST_FIELD_SEP = "\t"
 
 # One string: records separated by newline, fields (name, date, version,
 # count) by tab. ``{count}`` is substituted with a count expression or ``""``.
@@ -564,8 +564,8 @@ def list_scenarios(
     scenarios: list[ScenarioRef] = []
     if not output:
         return scenarios
-    for record in output.split(_RECORD_SEP):
-        fields = record.split(_FIELD_SEP)
+    for record in output.split(_LIST_RECORD_SEP):
+        fields = record.split(_LIST_FIELD_SEP)
         if len(fields) != 4:
             raise DatabaseAccessError(
                 f"Unexpected scenario listing from BaseX for {db_path}: {record!r}"
