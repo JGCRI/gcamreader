@@ -219,11 +219,12 @@ def test_work_dir_reuse(backend: FakeBackend, dbs: list[str], tmp_path: Path) ->
     assert len(backend.extractions) == 3
     files = sorted(p.name for p in work.iterdir())
     assert len(files) == 3 and all(f.endswith(api.INDEX_SUFFIX) for f in files)
-    second = api.compare_databases(dbs, work_dir=work)
+    messages: list[str] = []
+    second = api.compare_databases(dbs, work_dir=work, progress=messages.append)
     assert len(backend.extractions) == 3  # nothing re-extracted
-    assert len(second.warnings) == 3
-    assert all("reused the structure index" in w for w in second.warnings)
-    assert second.to_dict()["comparisons"] == first.to_dict()["comparisons"]
+    assert second.warnings == ()  # reuse is reported as progress, not as a warning
+    assert sum("reusing the structure index" in m for m in messages) == 3
+    assert second.to_dict() == first.to_dict()  # warm run identical to cold run
     assert work.exists()
 
 
@@ -257,9 +258,11 @@ def test_corrupt_index_in_work_dir_is_replaced(
     target = next(work.iterdir())
     target.write_bytes(b"garbage, not an index file at all")
     backend.extractions.clear()
-    result = api.compare_databases(dbs, work_dir=work)
+    messages: list[str] = []
+    result = api.compare_databases(dbs, work_dir=work, progress=messages.append)
     assert len(backend.extractions) == 1
-    assert len(result.warnings) == 2
+    assert result.warnings == ()
+    assert sum("reusing the structure index" in m for m in messages) == 2
 
 
 def test_temporary_work_dir_is_removed(

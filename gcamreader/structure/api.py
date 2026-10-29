@@ -254,11 +254,13 @@ def compare_databases(
             elif use_cache:
                 index = _reusable_index(index_path, fingerprint, scenario, rules)
                 if index is not None:
-                    warnings.append(
-                        f"Input {position} ({label}): reused the structure index "
-                        f"{index_path}; the database was not re-read."
+                    # Operational notice, not a result warning: a warm run must
+                    # produce the same report as a cold run.
+                    _report(
+                        progress,
+                        f"[{position}/{total}] {path}: reusing the structure index "
+                        f"{index_path} (database not re-read)",
                     )
-                    _report(progress, f"[{position}/{total}] {path}: reusing index")
             if index is None:
                 count = scenario.element_count or 0
                 _report(

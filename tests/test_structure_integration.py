@@ -330,7 +330,7 @@ def test_modified_database_findings(work: Path, modified: tuple[str, Mutation]) 
     assert year_leaf.descendant_count == 0
 
     assert comparison.summary.total == 4
-    assert result.warnings == () or all("reused" in w for w in result.warnings)
+    assert result.warnings == ()
 
 
 def test_cli_matches_api(work: Path, modified: tuple[str, Mutation]) -> None:
