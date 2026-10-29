@@ -257,7 +257,7 @@ class _Walker:
                 PathSegment(tag, node.identity).format() for node in nodes
             )
             detail = (
-                f"{verb} {len(nodes)} <{tag}> elements ({count} occurrence(s), "
+                f"{verb} {len(nodes)} {tag} elements ({count} occurrence(s), "
                 f"{descendants} descendant element(s)): {listed}"
             )
         self.findings.append(

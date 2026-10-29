@@ -397,7 +397,7 @@ def test_leaf_gaining_children(tmp_path: Path) -> None:
     assert finding.segments[-1] == PathSegment("t", ())
     assert finding.candidate.count == 2 and finding.candidate.metadata is None
     assert finding.detail == (
-        "Added 2 <t> elements (2 occurrence(s), 0 descendant element(s)): "
+        "Added 2 t elements (2 occurrence(s), 0 descendant element(s)): "
         "t[name=x], t[name=y]"
     )
     assert result.summary.counts["element_added"] == 1
@@ -607,7 +607,7 @@ def test_grouped_leaf_siblings(tmp_path: Path) -> None:
     assert finding.candidate is None
     assert finding.descendant_count == 0 and finding.descendant_tags == ()
     assert finding.detail.startswith(
-        "Removed 13 <Non-CO2> elements (13 occurrence(s), 0 descendant element(s)): Non-CO2[year=2040]"
+        "Removed 13 Non-CO2 elements (13 occurrence(s), 0 descendant element(s)): Non-CO2[year=2040]"
     )
     assert finding.detail.endswith("Non-CO2[year=2100]")
     assert finding.branch() == "r"  # no scenario/world to skip
