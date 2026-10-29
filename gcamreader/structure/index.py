@@ -96,6 +96,21 @@ INSERT INTO main.node
     GROUP BY parent_hash, tag_id, ident_id, meta_id;
 """
 
+_DESCENDANT_TAGS = """
+WITH RECURSIVE sub(h) AS (
+    SELECT ?
+    UNION
+    SELECT n.path_hash FROM node AS n JOIN sub ON n.parent_hash = sub.h
+    WHERE n.path_hash IS NOT NULL
+)
+SELECT t.value, SUM(n.count)
+FROM node AS n
+JOIN sub ON n.parent_hash = sub.h
+JOIN strings AS t ON t.id = n.tag_id
+GROUP BY t.value
+ORDER BY t.value
+"""
+
 _SELECT_CHILDREN = """
 SELECT n.parent_hash, n.path_hash, t.value, i.value, m.value, n.depth, n.count,
        n.subtree_size, n.f0, n.f1, n.f2, n.f3
@@ -380,6 +395,17 @@ class StructureIndex:
         ]
         rows.sort(key=lambda row: (row.tag, row.identity, row.metadata))
         return rows
+
+    def descendant_tag_counts(self, path_hash: bytes) -> tuple[tuple[str, int], ...]:
+        """Return ``(tag, occurrences)`` for every element below a position.
+
+        One recursive query; positions reached through several metadata
+        variants of the same element are visited once.
+        """
+        return tuple(
+            (tag, int(count))
+            for tag, count in self._conn.execute(_DESCENDANT_TAGS, (path_hash,))
+        )
 
     def iter_rows(self) -> Iterator[NodeRow]:
         """Iterate over every row (order unspecified)."""
