@@ -511,7 +511,7 @@ def scenarios(
 ) -> None:
     """List the scenario runs stored in local GCAM output databases.
 
-    Use the ``NAME@DATE`` shown here with ``diff --scenario`` when a database
+    Use the NAME@DATE shown here with 'diff --scenario' when a database
     holds several runs. Exit code 0 on success, 2 on any error. Remote
     databases are not supported.
     """
