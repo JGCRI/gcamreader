@@ -2,8 +2,10 @@
 
 :func:`build_index_from_stream` consumes any binary file-like object holding
 one serialized ``<scenario>`` document and writes the structure index without
-ever holding the document in memory. The BaseX subprocess that produces the
-stream for a real database is added by ``extract_structure`` (Java path).
+ever holding the document in memory. :func:`extract_structure` drives the
+BaseX subprocess that produces that stream for a real database;
+:func:`list_scenarios`, :func:`select_scenario` and
+:func:`fingerprint_database` cover discovery.
 
 The traversal keeps an explicit frame stack alongside ``lxml.iterparse``:
 
@@ -25,19 +27,31 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
+import shutil
 import struct
-from collections.abc import Callable, Mapping
+import subprocess
+import tempfile
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, BinaryIO
 
 from lxml import etree
 
-from gcamreader.structure.errors import ExtractionError
+from gcamreader.querymi import _default_miclasspath
+from gcamreader.structure.errors import (
+    DatabaseAccessError,
+    ExtractionError,
+    MissingDependencyError,
+    ScenarioSelectionError,
+)
 from gcamreader.structure.index import (
     ROOT_PARENT_HASH,
     SEP,
     IndexWriter,
     StructureIndex,
 )
+from gcamreader.structure.java_runtime import check_java, java_failure_error
+from gcamreader.structure.model import ScenarioRef
 from gcamreader.structure.rules import ComparisonRules
 
 logger = logging.getLogger(__name__)
@@ -366,3 +380,424 @@ def _report(
     if final:
         message += ", done"
     progress(message)
+
+
+# ---------------------------------------------------------------------------
+# Java path: database validation, discovery, selection, extraction
+# ---------------------------------------------------------------------------
+
+#: Default JVM heap. Step 1 showed 512 MB suffices for streaming a 2.7 GiB
+#: scenario; 4g keeps parity with ``LocalDBConn``.
+DEFAULT_JAVA_MAX_MEMORY = "4g"
+
+#: Estimated peak disk per element during a build (index plus scratch file),
+#: from the step 3 full run: ~7 GB for 48.5 M elements.
+BYTES_PER_ELEMENT_ESTIMATE = 150
+
+#: Files every BaseX database directory contains.
+REQUIRED_DB_FILES = ("inf.basex", "tbl.basex")
+
+#: Separators in the scenario listing output. XQuery string literals cannot
+#: hold characters that are invalid in XML, so control characters are out.
+#: Tab and newline are safe: XML attribute-value normalization turns them
+#: into spaces, so no stored @name or @date can contain them.
+_RECORD_SEP = "\n"
+_FIELD_SEP = "\t"
+
+# One string: records separated by newline, fields (name, date, version,
+# count) by tab. ``{count}`` is substituted with a count expression or ``""``.
+_LIST_QUERY_TEMPLATE = (
+    "string-join(for $s in collection()/scenario return string-join(("
+    "string($s/@name), string($s/@date), string($s/model-version[1]), {count}"
+    "), codepoints-to-string(9)), codepoints-to-string(10))"
+)
+_COUNT_EXPRESSION = "string(count($s/descendant-or-self::*))"
+
+#: Streams exactly one scenario document; name and date are bound externally.
+SCENARIO_QUERY = (
+    "declare variable $n external; declare variable $d external; "
+    "collection()/scenario[@name = $n and @date = $d]"
+)
+
+
+def validate_database_dir(db_path: str) -> tuple[str, str]:
+    """Check that ``db_path`` is a local BaseX database directory.
+
+    Returns:
+        ``(parent, name)``: the directory BaseX must use as ``DBPATH`` and
+        the database name to open.
+
+    Raises:
+        DatabaseAccessError: If the path is not a directory or lacks the
+            BaseX storage files.
+    """
+    path = os.path.abspath(db_path)
+    if not os.path.isdir(path):
+        raise DatabaseAccessError(
+            f"{db_path} is not a directory. Structural comparison works on local "
+            "BaseX databases (directories containing *.basex files); remote "
+            "databases are not supported."
+        )
+    missing = [
+        name
+        for name in REQUIRED_DB_FILES
+        if not os.path.isfile(os.path.join(path, name))
+    ]
+    if missing:
+        raise DatabaseAccessError(
+            f"{db_path} does not look like a BaseX database: missing "
+            + ", ".join(missing)
+        )
+    parent, name = os.path.split(path)
+    if not name:
+        raise DatabaseAccessError(f"{db_path} has no database name component")
+    return parent, name
+
+
+def fingerprint_database(db_path: str) -> str:
+    """Return a sha256 hex digest identifying the database contents cheaply.
+
+    Covers the full content of ``inf.basex`` (BaseX metadata, including the
+    modification timestamp) plus the names and sizes of all ``*.basex``
+    files. It does not hash the multi-gigabyte table files, so an in-place
+    modification that keeps sizes unchanged is not detected; the CLI offers
+    ``--no-cache`` for that case.
+    """
+    path = os.path.abspath(db_path)
+    digest = hashlib.sha256()
+    with open(os.path.join(path, "inf.basex"), "rb") as handle:
+        digest.update(handle.read())
+    for name in sorted(os.listdir(path)):
+        if name.endswith(".basex"):
+            size = os.path.getsize(os.path.join(path, name))
+            digest.update(f"{name}\0{size}\0".encode())
+    return digest.hexdigest()
+
+
+def _basex_command(
+    java: str,
+    miclasspath: str | None,
+    java_max_memory: str,
+    parent: str,
+    db_name: str,
+    *serializer_options: str,
+    binds: Sequence[tuple[str, str]] = (),
+    query: str,
+) -> list[str]:
+    """Assemble a ``java ... org.basex.BaseX`` command line."""
+    return [
+        java,
+        "-cp",
+        miclasspath or _default_miclasspath,
+        f"-Xmx{java_max_memory}",
+        "-Dfile.encoding=UTF-8",
+        "-Djava.awt.headless=true",
+        f"-Dorg.basex.DBPATH={parent}",
+        "org.basex.BaseX",
+        *serializer_options,
+        *(f"-b{name}={value}" for name, value in binds),
+        "-i",
+        db_name,
+        query,
+    ]
+
+
+def _run_basex(cmd: list[str], *, context: str) -> str:
+    """Run a short BaseX command to completion and return its stdout."""
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, encoding="utf-8", errors="replace", check=False
+        )
+    except OSError as exc:
+        raise MissingDependencyError(f"{context}: cannot start Java: {exc}") from exc
+    if proc.returncode != 0:
+        raise java_failure_error(
+            proc.stderr, returncode=proc.returncode, context=context
+        )
+    return proc.stdout
+
+
+def list_scenarios(
+    db_path: str,
+    *,
+    with_counts: bool = False,
+    java_max_memory: str = DEFAULT_JAVA_MAX_MEMORY,
+    miclasspath: str | None = None,
+    java: str | None = None,
+) -> list[ScenarioRef]:
+    """List the scenario runs stored in a local database.
+
+    Args:
+        db_path: Database directory.
+        with_counts: Also count the elements of each scenario (a full
+            in-database traversal, ~5 s for a 3 GB database). Needed before
+            :func:`extract_structure` can verify completeness.
+        java_max_memory: JVM ``-Xmx`` value.
+        miclasspath: Java class path; defaults to the bundled jars.
+        java: Explicit ``java`` executable; otherwise resolved by
+            :func:`~gcamreader.structure.java_runtime.check_java`.
+
+    Returns:
+        Scenarios in database order, possibly empty.
+
+    Raises:
+        DatabaseAccessError: If the directory is not a database or BaseX
+            fails to read it.
+        MissingDependencyError: If no usable Java runtime is found.
+    """
+    parent, name = validate_database_dir(db_path)
+    java_info = check_java(java)
+    query = _LIST_QUERY_TEMPLATE.format(
+        count=_COUNT_EXPRESSION if with_counts else '""'
+    )
+    cmd = _basex_command(
+        java_info.path,
+        miclasspath,
+        java_max_memory,
+        parent,
+        name,
+        "-smethod=text",
+        query=query,
+    )
+    output = _run_basex(cmd, context=f"Listing scenarios in {db_path} failed")
+    output = output.rstrip("\r\n")
+    scenarios: list[ScenarioRef] = []
+    if not output:
+        return scenarios
+    for record in output.split(_RECORD_SEP):
+        fields = record.split(_FIELD_SEP)
+        if len(fields) != 4:
+            raise DatabaseAccessError(
+                f"Unexpected scenario listing from BaseX for {db_path}: {record!r}"
+            )
+        scenario_name, date, version, count = fields
+        scenarios.append(
+            ScenarioRef(
+                name=scenario_name,
+                date=date,
+                version=version or None,
+                element_count=int(count) if count else None,
+            )
+        )
+    return scenarios
+
+
+def parse_selector(selector: str) -> tuple[str, str | None]:
+    """Split a ``NAME`` or ``NAME@DATE`` selector.
+
+    The split is on the last ``@`` so names containing ``@`` work as long as
+    the date is given.
+
+    Raises:
+        ScenarioSelectionError: If either part is empty.
+    """
+    text = selector.strip()
+    if "@" not in text:
+        if not text:
+            raise ScenarioSelectionError("Scenario selector must be NAME or NAME@DATE")
+        return text, None
+    name, date = text.rsplit("@", 1)
+    if not name or not date:
+        raise ScenarioSelectionError(
+            f"Scenario selector {selector!r} must be NAME or NAME@DATE"
+        )
+    return name, date
+
+
+def select_scenario(
+    scenarios: Sequence[ScenarioRef],
+    selector: str | None = None,
+    *,
+    source: str = "the database",
+) -> ScenarioRef:
+    """Pick exactly one scenario, never guessing.
+
+    Args:
+        scenarios: Candidates, normally from :func:`list_scenarios`.
+        selector: ``None`` (only valid when there is exactly one scenario),
+            ``NAME`` (valid when one run has that name) or ``NAME@DATE``.
+        source: Database label for messages.
+
+    Raises:
+        ScenarioSelectionError: If zero or several scenarios match. The
+            message lists the available ``NAME@DATE`` labels.
+    """
+    available = ", ".join(s.label for s in scenarios)
+    if not scenarios:
+        raise ScenarioSelectionError(f"{source} contains no scenarios")
+    if selector is None:
+        if len(scenarios) == 1:
+            return scenarios[0]
+        raise ScenarioSelectionError(
+            f"{source} contains {len(scenarios)} scenarios; choose one with "
+            f"--scenario NAME@DATE: {available}"
+        )
+    name, date = parse_selector(selector)
+    matches = [
+        s for s in scenarios if s.name == name and (date is None or s.date == date)
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise ScenarioSelectionError(
+            f"No scenario {selector!r} in {source}; available: {available}"
+        )
+    labels = ", ".join(m.label for m in matches)
+    if date is None:
+        raise ScenarioSelectionError(
+            f"Scenario name {name!r} matches {len(matches)} runs in {source}; "
+            f"select one with NAME@DATE: {labels}"
+        )
+    raise ScenarioSelectionError(
+        f"{len(matches)} runs in {source} share the name and date {selector!r}; "
+        "they cannot be told apart, so this database cannot be compared"
+    )
+
+
+def _check_disk_space(index_path: str, element_count: int | None) -> None:
+    if not element_count:
+        return
+    directory = os.path.dirname(os.path.abspath(index_path))
+    needed = element_count * BYTES_PER_ELEMENT_ESTIMATE
+    free = shutil.disk_usage(directory).free
+    if free < needed:
+        raise ExtractionError(
+            f"Not enough free disk space in {directory}: building the structure "
+            f"index of {element_count:,} elements needs about {needed / 2**30:.1f} "
+            f"GiB, {free / 2**30:.1f} GiB available. Use --work-dir to choose "
+            "another location."
+        )
+
+
+def _read_spool(spool: Any) -> str:
+    spool.seek(0)
+    return spool.read().decode("utf-8", "replace")
+
+
+def extract_structure(
+    db_path: str,
+    scenario: ScenarioRef,
+    index_path: str,
+    rules: ComparisonRules,
+    *,
+    java_max_memory: str = DEFAULT_JAVA_MAX_MEMORY,
+    miclasspath: str | None = None,
+    progress: ProgressCallback | None = None,
+    java: str | None = None,
+) -> StructureIndex:
+    """Stream one scenario out of a database into a new structure index.
+
+    BaseX serializes the scenario document to stdout, which is parsed
+    incrementally by :func:`build_index_from_stream`; no temporary XML is
+    written. The database is opened read-only and never modified.
+
+    Args:
+        db_path: Database directory.
+        scenario: The run to extract; its ``element_count`` (from
+            :func:`list_scenarios` with ``with_counts=True``) enables the
+            completeness check.
+        index_path: Where to write the index. Replaced if present.
+        rules: Comparison rules.
+        java_max_memory: JVM ``-Xmx`` value.
+        miclasspath: Java class path; defaults to the bundled jars.
+        progress: Progress callback, see :func:`build_index_from_stream`.
+        java: Explicit ``java`` executable.
+
+    Returns:
+        The completed index.
+
+    Raises:
+        ExtractionError: If BaseX exits with an error, the stream is cut
+            short or malformed, the element count does not match, or disk
+            space is insufficient. No index file is left behind.
+        DatabaseAccessError: If the directory is not a database.
+        MissingDependencyError: If Java is unusable or runs out of memory.
+    """
+    parent, name = validate_database_dir(db_path)
+    java_info = check_java(java)
+    _check_disk_space(index_path, scenario.element_count)
+    cmd = _basex_command(
+        java_info.path,
+        miclasspath,
+        java_max_memory,
+        parent,
+        name,
+        "-smethod=xml",
+        "-sindent=no",
+        "-somit-xml-declaration=yes",
+        binds=(("n", scenario.name), ("d", scenario.date)),
+        query=SCENARIO_QUERY,
+    )
+    info = {
+        "db_path": os.path.abspath(db_path),
+        "db_fingerprint": fingerprint_database(db_path),
+        "scenario_name": scenario.name,
+        "scenario_date": scenario.date,
+        "scenario_version": scenario.version or "",
+        "java_version": java_info.version,
+        "java_path": java_info.path,
+    }
+    logger.info("Extracting %s from %s", scenario.label, db_path)
+    logger.debug("BaseX command: %s", " ".join(cmd))
+    stderr = tempfile.SpooledTemporaryFile(max_size=1 << 20)
+    try:
+        try:
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=stderr, bufsize=1 << 20
+            )
+        except OSError as exc:
+            raise MissingDependencyError(
+                f"Cannot start Java at {java_info.path!r}: {exc}"
+            ) from exc
+        try:
+            assert proc.stdout is not None
+            try:
+                index = build_index_from_stream(
+                    proc.stdout,
+                    index_path,
+                    rules,
+                    source=db_path,
+                    expected_elements=scenario.element_count,
+                    progress=progress,
+                    info=info,
+                )
+            except ExtractionError as exc:
+                # The stream ended early or was malformed; BaseX may say why.
+                returncode = proc.poll()
+                if returncode is None:
+                    proc.kill()
+                    proc.wait()
+                java_output = _read_spool(stderr)
+                if returncode is None and not java_output.strip():
+                    raise
+                raise java_failure_error(
+                    java_output,
+                    returncode=returncode,
+                    context=str(exc),
+                    default=ExtractionError,
+                ) from exc
+            returncode = proc.wait()
+            if returncode != 0:
+                index.close()
+                try:
+                    os.remove(index_path)
+                except FileNotFoundError:
+                    pass
+                raise java_failure_error(
+                    _read_spool(stderr),
+                    returncode=returncode,
+                    context=f"BaseX failed while exporting {scenario.label} from {db_path}",
+                    default=ExtractionError,
+                )
+            noise = _read_spool(stderr).strip()
+            if noise:
+                logger.debug("BaseX stderr for %s: %s", db_path, noise[-800:])
+            return index
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+            if proc.stdout is not None:
+                proc.stdout.close()
+    finally:
+        stderr.close()
