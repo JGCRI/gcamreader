@@ -36,7 +36,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -109,6 +109,22 @@ JOIN sub ON n.parent_hash = sub.h
 JOIN strings AS t ON t.id = n.tag_id
 GROUP BY t.value
 ORDER BY t.value
+"""
+
+_DESCENDANT_TAGS_MANY = """
+WITH RECURSIVE seeds(h) AS (VALUES __SEEDS__),
+sub(root, h) AS (
+    SELECT h, h FROM seeds
+    UNION
+    SELECT sub.root, n.path_hash FROM node AS n JOIN sub ON n.parent_hash = sub.h
+    WHERE n.path_hash IS NOT NULL
+)
+SELECT sub.root, t.value, SUM(n.count)
+FROM node AS n
+JOIN sub ON n.parent_hash = sub.h
+JOIN strings AS t ON t.id = n.tag_id
+GROUP BY sub.root, t.value
+ORDER BY sub.root, t.value
 """
 
 _SELECT_CHILDREN = """
@@ -406,6 +422,27 @@ class StructureIndex:
             (tag, int(count))
             for tag, count in self._conn.execute(_DESCENDANT_TAGS, (path_hash,))
         )
+
+    def descendant_tag_counts_many(
+        self, path_hashes: Sequence[bytes], *, batch_size: int = 10_000
+    ) -> dict[bytes, tuple[tuple[str, int], ...]]:
+        """Histograms for many positions in a few queries.
+
+        The positions must have disjoint subtrees (none is a descendant of
+        another), which holds for the one-sided nodes of a comparison because
+        the walk never descends into them. Per-query overhead, not row volume,
+        dominates when hundreds of thousands of subtrees are summarised, so
+        the seeds are passed in batches of ``batch_size``.
+        """
+        result: dict[bytes, list[tuple[str, int]]] = {h: [] for h in path_hashes}
+        seeds = list(dict.fromkeys(path_hashes))
+        for start in range(0, len(seeds), batch_size):
+            batch = seeds[start : start + batch_size]
+            values = ",".join("(?)" for _ in batch)
+            query = _DESCENDANT_TAGS_MANY.replace("__SEEDS__", values)
+            for root, tag, count in self._conn.execute(query, batch):
+                result[bytes(root)].append((tag, int(count)))
+        return {h: tuple(tags) for h, tags in result.items()}
 
     def iter_rows(self) -> Iterator[NodeRow]:
         """Iterate over every row (order unspecified)."""

@@ -156,7 +156,10 @@ def test_element_containing_zero_is_still_present(tmp_path: Path) -> None:
 # --- criterion 3: new sector under the right region --------------------------------
 
 
-def test_added_sector_reported_once_with_descendants(tmp_path: Path) -> None:
+def test_added_sector_reported_once_with_descendants(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(compare, "HISTOGRAM_MIN_DESCENDANTS", 1)
     added = BASE.replace(
         '<region name="China">',
         '<region name="China"><sector name="new"><subsector name="s1"><technology name="t" year="2020"/>'
@@ -176,14 +179,32 @@ def test_added_sector_reported_once_with_descendants(tmp_path: Path) -> None:
     assert finding.descendant_count == 4
     assert finding.descendant_tags == (("subsector", 2), ("technology", 2))
     assert "4 descendant element(s)" in finding.detail
+    assert finding.members == 1 and not finding.is_grouped
+    assert finding.identities == ((("name", "new"),),)
     assert result.summary.counts["element_added"] == 1
+    assert result.summary.elements["element_added"] == 1
     assert result.summary.descendants_summarized == 4
+
+
+def test_histogram_threshold_default(tmp_path: Path) -> None:
+    added = BASE.replace(
+        '<region name="China">',
+        '<region name="China"><sector name="new"><subsector name="s1"><technology name="t" year="2020"/>'
+        '<technology name="t" year="2025"/></subsector><subsector name="s2"/></sector>',
+    )
+    (finding,) = compare_xml(BASE, added, tmp_path).findings
+    assert compare.HISTOGRAM_MIN_DESCENDANTS == 50
+    assert finding.descendant_count == 4  # always available
+    assert finding.descendant_tags == ()  # below the threshold: no histogram
 
 
 # --- criterion 4: removal, move, counts --------------------------------------------
 
 
-def test_removed_technology_is_one_finding(tmp_path: Path) -> None:
+def test_removed_technology_is_one_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(compare, "HISTOGRAM_MIN_DESCENDANTS", 1)
     removed = BASE.replace(
         '<subsector name="gas">\n          <technology name="gas (CC)" year="2020"><input name="gas">0.2</input></technology>\n        </subsector>',
         '<subsector name="gas"/>',
@@ -327,15 +348,18 @@ def test_root_identity_difference_when_name_not_excluded(tmp_path: Path) -> None
     other = BASE.replace('name="GCAM"', 'name="Other"')
     result = compare_xml(BASE, other, tmp_path, rules)
     assert kinds(result) == [
-        ("element_removed", "scenario[name=GCAM]"),
         ("element_added", "scenario[name=Other]"),
+        ("element_removed", "scenario[name=GCAM]"),
     ]
     assert (
         result.findings[0].descendant_count == result.findings[1].descendant_count == 17
     )
 
 
-def test_unfamiliar_elements_detected(tmp_path: Path) -> None:
+def test_unfamiliar_elements_detected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(compare, "HISTOGRAM_MIN_DESCENDANTS", 1)
     novel = BASE.replace(
         '<region name="China">',
         '<region name="China"><hydrogen-hub name="h2" capacity-unit="GW"><node id="1" year="2030"/></hydrogen-hub>',
@@ -362,23 +386,39 @@ def test_leaf_gaining_children(tmp_path: Path) -> None:
     a = "<r><s name='a'/></r>"
     b = "<r><s name='a'><t name='x'/><t name='y'/></s></r>"
     result = compare_xml(a, b, tmp_path)
+    # Two added siblings with the same tag are one grouped finding.
     assert kinds(result) == [
-        ("element_added", "r > s[name=a] > t[name=x]"),
-        ("element_added", "r > s[name=a] > t[name=y]"),
+        ("element_added", "r > s[name=a] > t[name: x, y (2 values)]"),
     ]
+    (finding,) = result.findings
+    assert finding.is_grouped and finding.members == 2
+    assert finding.identity == ()
+    assert finding.identities == ((("name", "x"),), (("name", "y"),))
+    assert finding.segments[-1] == PathSegment("t", ())
+    assert finding.candidate.count == 2 and finding.candidate.metadata is None
+    assert finding.detail == (
+        "Added 2 <t> elements (2 occurrence(s), 0 descendant element(s)): "
+        "t[name=x], t[name=y]"
+    )
+    assert result.summary.counts["element_added"] == 1
+    assert result.summary.elements["element_added"] == 2
     reverse = compare_xml(b, a, tmp_path)
-    assert [k for k, _ in kinds(reverse)] == ["element_removed", "element_removed"]
+    assert [(f.kind.value, f.members) for f in reverse.findings] == [
+        ("element_removed", 2)
+    ]
 
 
 def test_findings_in_deterministic_depth_first_order(tmp_path: Path) -> None:
     a = "<r><b name='1'><x/><y name='k' u='1'/></b><a name='2'><z/></a><c/></r>"
     b = "<r><b name='1'><y name='k' u='2'/></b><a name='2'><z/><w/></a><c/><d/></r>"
     result = compare_xml(a, b, tmp_path)
+    # Per position: in-place changes first, then added, then removed groups;
+    # children are visited depth-first in sorted order.
     assert kinds(result) == [
         ("element_added", "r > d"),
         ("element_added", "r > a[name=2] > w"),
-        ("element_removed", "r > b[name=1] > x"),
         ("attribute_changed", "r > b[name=1] > y[name=k]"),
+        ("element_removed", "r > b[name=1] > x"),
     ]
     again = compare_xml(a, b, tmp_path)
     assert json.dumps(again.to_dict(), sort_keys=True) == json.dumps(
@@ -500,3 +540,137 @@ def test_finding_objects_are_json_safe(tmp_path: Path) -> None:
     json.dumps(data)
     assert isinstance(result.findings[0], Finding)
     assert data["summary"]["counts"]["attribute_changed"] == 1
+
+
+def test_descendant_tag_counts_many_batches(tmp_path: Path) -> None:
+    xml = (
+        "<r><a name='1'><t/><t/><u><v/></u></a><a name='2'><t/></a>"
+        "<a name='3'/><a name='4'><w/></a></r>"
+    )
+    with build(xml, tmp_path) as index:
+        rows = index.children(index.root().path_hash)
+        seeds = [row.path_hash for row in rows if row.path_hash is not None]
+        assert len(seeds) == 3  # a[3] is a leaf
+        many = index.descendant_tag_counts_many(seeds, batch_size=2)
+        by_name = {row.identity[0][1]: row.path_hash for row in rows}
+        assert many[by_name["1"]] == (("t", 2), ("u", 1), ("v", 1))
+        assert many[by_name["2"]] == (("t", 1),)
+        assert many[by_name["4"]] == (("w", 1),)
+        assert all(many[h] == index.descendant_tag_counts(h) for h in seeds)
+        assert index.descendant_tag_counts_many([]) == {}
+        # Duplicate seeds are tolerated.
+        assert index.descendant_tag_counts_many([seeds[0], seeds[0]]) == {
+            seeds[0]: many[seeds[0]]
+        }
+
+
+def test_one_sided_findings_get_histograms_after_walk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(compare, "HISTOGRAM_MIN_DESCENDANTS", 1)
+    a = "<r><s name='x'><t/><t/><u name='k'><v/></u></s><leaf/></r>"
+    result = compare_xml(a, "<r/>", tmp_path)
+    by_path = {f.path: f for f in result.findings}
+    assert by_path["r > s[name=x]"].descendant_tags == (("t", 2), ("u", 1), ("v", 1))
+    assert by_path["r > s[name=x]"].descendant_count == 4
+    assert by_path["r > leaf"].descendant_tags == ()
+    assert by_path["r > leaf"].descendant_count == 0
+
+
+# --- grouped one-sided findings ----------------------------------------------------------
+
+
+def _years(tag: str, years: range, children: str = "") -> str:
+    return "".join(f"<{tag} year='{y}'>{children}</{tag}>" for y in years)
+
+
+def test_grouped_leaf_siblings(tmp_path: Path) -> None:
+    base = (
+        "<r><tech name='coal'>"
+        + _years("Non-CO2", range(2020, 2105, 5))
+        + "</tech></r>"
+    )
+    cand = (
+        "<r><tech name='coal'>"
+        + _years("Non-CO2", range(2020, 2040, 5))
+        + "</tech></r>"
+    )
+    result = compare_xml(base, cand, tmp_path)
+    (finding,) = result.findings
+    assert finding.kind is FindingKind.ELEMENT_REMOVED
+    assert finding.path == "r > tech[name=coal] > Non-CO2[year=2040..2100 (13 values)]"
+    assert finding.members == 13
+    assert [dict(i)["year"] for i in finding.identities] == [
+        str(y) for y in range(2040, 2105, 5)
+    ]
+    assert finding.baseline.count == 13 and finding.baseline.subtree_size == 13
+    assert finding.candidate is None
+    assert finding.descendant_count == 0 and finding.descendant_tags == ()
+    assert finding.detail.startswith(
+        "Removed 13 <Non-CO2> elements (13 occurrence(s), 0 descendant element(s)): Non-CO2[year=2040]"
+    )
+    assert finding.detail.endswith("Non-CO2[year=2100]")
+    assert finding.branch() == "r"  # no scenario/world to skip
+    assert result.summary.elements == {"element_added": 0, "element_removed": 13}
+    assert result.summary.total == 1
+
+
+def test_grouped_siblings_separate_by_tag_and_kind(tmp_path: Path) -> None:
+    base = "<r><a name='1'/><a name='2'/><b name='1'/><c name='1'/></r>"
+    cand = "<r><c name='1'/><c name='2'/><d name='1'/><d name='2'/><d name='3'/></r>"
+    result = compare_xml(base, cand, tmp_path)
+    assert [(f.kind.value, f.tag, f.members, f.path) for f in result.findings] == [
+        ("element_added", "c", 1, "r > c[name=2]"),
+        ("element_added", "d", 3, "r > d[name=1..3 (3 values)]"),
+        ("element_removed", "a", 2, "r > a[name=1..2 (2 values)]"),
+        ("element_removed", "b", 1, "r > b[name=1]"),
+    ]
+
+
+def test_grouped_siblings_histogram_covers_qualifying_members(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(compare, "HISTOGRAM_MIN_DESCENDANTS", 3)
+    big = "<t name='x'><p/><p/><q/></t>"  # 3 descendants: qualifies
+    small = "<t name='y'><p/></t>"  # 1 descendant: counted, not summarised
+    base = "<r><s>" + big + small + "<t name='z'/></s></r>"
+    result = compare_xml(base, "<r><s/></r>", tmp_path)
+    (finding,) = result.findings
+    assert finding.members == 3
+    assert finding.descendant_count == 4
+    assert finding.descendant_tags == (("p", 2), ("q", 1))
+    # Everything qualifies when the threshold is lowered.
+    monkeypatch.setattr(compare, "HISTOGRAM_MIN_DESCENDANTS", 1)
+    (finding,) = compare_xml(base, "<r><s/></r>", tmp_path).findings
+    assert finding.descendant_tags == (("p", 3), ("q", 1))
+
+
+def test_grouped_findings_in_matrix(tmp_path: Path) -> None:
+    base = "<r>" + _years("x", range(2020, 2035, 5)) + "</r>"
+    inputs = (_input(1), _input(2), _input(3))
+    with (
+        build(base, tmp_path) as b,
+        build("<r/>", tmp_path) as c1,
+        build(base, tmp_path) as c2,
+    ):
+        comparisons = (
+            compare.compare_indexes(
+                b, c1, baseline_input=inputs[0], candidate_input=inputs[1]
+            ),
+            compare.compare_indexes(
+                b, c2, baseline_input=inputs[0], candidate_input=inputs[2]
+            ),
+        )
+    (row,) = compare.build_matrix(inputs, comparisons)
+    assert row.path == "r > x[year=2020..2030 (3 values)]"
+    assert row.cells == ("present", "absent", "present")
+
+
+def test_grouped_findings_are_json_safe_and_deterministic(tmp_path: Path) -> None:
+    base = "<r><s name='a'>" + _years("x", range(2020, 2050, 5)) + "</s></r>"
+    cand = "<r><s name='a'>" + _years("x", range(2020, 2030, 5)) + "</s></r>"
+    first = compare_xml(base, cand, tmp_path).to_dict()
+    second = compare_xml(base, cand, tmp_path).to_dict()
+    assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
+    assert first["findings"][0]["members"] == 4
+    assert len(first["findings"][0]["identities"]) == 4

@@ -46,7 +46,7 @@ def format_value(value: str) -> str:
     return value
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PathSegment:
     """One element on a path: its tag and identity attributes.
 
@@ -73,6 +73,40 @@ class PathSegment:
 def format_path(segments: Iterable[PathSegment]) -> str:
     """Join segments as ``scenario > world > region[name=USA]``."""
     return " > ".join(segment.format() for segment in segments)
+
+
+def summarize_identities(identities: Sequence[Pairs]) -> str:
+    """Compress the identities of grouped sibling elements for a path.
+
+    One identity is formatted as in :meth:`PathSegment.format`. Several are
+    summarised per attribute: a constant value as ``name=coal``, integer
+    values as ``year=2040..2100 (13 values)``, other values as
+    ``name: a, b, c, +4 more (7 values)``. The full list stays available in
+    :attr:`Finding.identities`.
+    """
+    if not identities:
+        return ""
+    if len(identities) == 1:
+        return ", ".join(f"{k}={format_value(v)}" for k, v in identities[0])
+    values_by_name: dict[str, list[str]] = {}
+    for identity in identities:
+        for name, value in identity:
+            values_by_name.setdefault(name, []).append(value)
+    parts = []
+    for name, values in values_by_name.items():
+        distinct = sorted(set(values))
+        if len(distinct) == 1:
+            parts.append(f"{name}={format_value(distinct[0])}")
+            continue
+        try:
+            numbers = sorted(int(value) for value in distinct)
+        except ValueError:
+            shown = ", ".join(format_value(value) for value in distinct[:3])
+            more = f", +{len(distinct) - 3} more" if len(distinct) > 3 else ""
+            parts.append(f"{name}: {shown}{more} ({len(distinct)} values)")
+        else:
+            parts.append(f"{name}={numbers[0]}..{numbers[-1]} ({len(distinct)} values)")
+    return ", ".join(parts)
 
 
 # -- inputs ------------------------------------------------------------------
@@ -142,7 +176,7 @@ class InputIdentity:
 # -- findings ----------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AttributeChange:
     """A metadata attribute that differs between baseline and candidate.
 
@@ -171,7 +205,7 @@ class AttributeChange:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class NodeSnapshot:
     """What one side knows about a path.
 
@@ -201,22 +235,34 @@ class NodeSnapshot:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Finding:
     """One structural difference at one path.
+
+    Added or removed sibling elements that share a parent and a tag are
+    reported as one *grouped* finding (``members > 1``): its last path
+    segment carries no identity, :attr:`identities` lists every member, and
+    :attr:`path` ends in a summary such as ``Non-CO2[year=2040..2100 (13
+    values)]``. Nothing is dropped; grouping only keeps reports and memory
+    proportional to the number of changed branches.
 
     Attributes:
         kind: The kind of difference.
         path: Formatted path (see :func:`format_path`).
         segments: The same path as data.
-        tag: Tag of the differing element.
-        identity: Identity pairs of the differing element.
+        tag: Tag of the differing element(s).
+        identity: Identity pairs of the differing element; empty for grouped
+            findings.
+        identities: Identities of all members of an added/removed finding
+            (one entry for a single element), sorted.
+        members: Number of sibling elements covered by this finding.
         baseline: Snapshot on the baseline side, ``None`` if absent there.
         candidate: Snapshot on the candidate side, ``None`` if absent there.
         attribute_changes: Per-attribute detail for ``attribute_changed``.
-        descendant_count: Elements below an added or removed element.
+        descendant_count: Elements below the added or removed element(s).
         descendant_tags: ``(tag, count)`` histogram of those descendants,
-            sorted by tag.
+            sorted by tag. Computed only for members with at least
+            ``compare.HISTOGRAM_MIN_DESCENDANTS`` descendants; empty otherwise.
         detail: Free-text explanation shown in reports.
     """
 
@@ -225,12 +271,18 @@ class Finding:
     segments: tuple[PathSegment, ...]
     tag: str
     identity: Pairs = ()
+    identities: tuple[Pairs, ...] = ()
+    members: int = 1
     baseline: NodeSnapshot | None = None
     candidate: NodeSnapshot | None = None
     attribute_changes: tuple[AttributeChange, ...] = ()
     descendant_count: int = 0
     descendant_tags: tuple[tuple[str, int], ...] = ()
     detail: str = ""
+
+    @property
+    def is_grouped(self) -> bool:
+        return self.members > 1
 
     def branch(self, skip: Sequence[str] = ("scenario", "world")) -> str:
         """Return the formatted segment used to group findings in reports.
@@ -251,6 +303,10 @@ class Finding:
             "segments": [segment.to_dict() for segment in self.segments],
             "tag": self.tag,
             "identity": [list(pair) for pair in self.identity],
+            "identities": [
+                [list(pair) for pair in identity] for identity in self.identities
+            ],
+            "members": self.members,
             "baseline": None if self.baseline is None else self.baseline.to_dict(),
             "candidate": None if self.candidate is None else self.candidate.to_dict(),
             "attribute_changes": [
@@ -270,29 +326,44 @@ class ComparisonSummary:
         counts: Findings per kind, keyed by :attr:`FindingKind.value`; every
             kind is present, possibly with zero.
         total: All findings.
+        elements: Added or removed elements per kind (grouped findings count
+            each member), keyed like ``counts`` for the two one-sided kinds.
         descendants_summarized: Elements below added or removed elements that
             are reported only as a summary.
     """
 
     counts: Mapping[str, int]
     total: int
+    elements: Mapping[str, int]
     descendants_summarized: int
 
     @classmethod
     def from_findings(cls, findings: Iterable[Finding]) -> ComparisonSummary:
         counts = {kind.value: 0 for kind in FindingKind}
+        elements = {
+            FindingKind.ELEMENT_ADDED.value: 0,
+            FindingKind.ELEMENT_REMOVED.value: 0,
+        }
         total = 0
         descendants = 0
         for finding in findings:
             counts[finding.kind.value] += 1
             total += 1
             descendants += finding.descendant_count
-        return cls(counts=counts, total=total, descendants_summarized=descendants)
+            if finding.kind.value in elements:
+                elements[finding.kind.value] += finding.members
+        return cls(
+            counts=counts,
+            total=total,
+            elements=elements,
+            descendants_summarized=descendants,
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "counts": dict(self.counts),
             "total": self.total,
+            "elements": dict(self.elements),
             "descendants_summarized": self.descendants_summarized,
         }
 

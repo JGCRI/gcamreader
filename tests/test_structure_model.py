@@ -23,6 +23,7 @@ from gcamreader.structure.model import (
     ScenarioRef,
     format_path,
     format_value,
+    summarize_identities,
 )
 
 # --- paths ------------------------------------------------------------------
@@ -287,3 +288,66 @@ def test_model_objects_are_immutable() -> None:
         _scenario().name = "x"  # type: ignore[misc]
     with pytest.raises(AttributeError):
         _finding().kind = FindingKind.COUNT_CHANGED  # type: ignore[misc]
+
+
+@pytest.mark.parametrize(
+    ("identities", "expected"),
+    [
+        ((), ""),
+        (((("name", "coal"), ("year", "2020")),), "name=coal, year=2020"),
+        (
+            ((("year", "2040"),), (("year", "2045"),), (("year", "2100"),)),
+            "year=2040..2100 (3 values)",
+        ),
+        (
+            ((("year", "5"),), (("year", "10"),)),
+            "year=5..10 (2 values)",
+        ),
+        (
+            (
+                (("name", "coal"), ("year", "2020")),
+                (("name", "coal"), ("year", "2025")),
+            ),
+            "name=coal, year=2020..2025 (2 values)",
+        ),
+        (
+            ((("name", "b"),), (("name", "a"),), (("name", "c, d"),)),
+            'name: a, b, "c, d" (3 values)',
+        ),
+        (
+            (
+                (("name", "e"),),
+                (("name", "d"),),
+                (("name", "c"),),
+                (("name", "b"),),
+                (("name", "a"),),
+            ),
+            "name: a, b, c, +2 more (5 values)",
+        ),
+    ],
+)
+def test_summarize_identities(identities, expected: str) -> None:
+    assert summarize_identities(identities) == expected
+
+
+def test_grouped_finding_fields_and_summary_elements() -> None:
+    grouped = _finding(
+        FindingKind.ELEMENT_REMOVED,
+        identity=(),
+        identities=((("year", "2040"),), (("year", "2045"),)),
+        members=2,
+        baseline=NodeSnapshot(count=2, metadata=None, subtree_size=2),
+        candidate=None,
+    )
+    assert grouped.is_grouped
+    assert not _finding().is_grouped
+    data = grouped.to_dict()
+    json.dumps(data)
+    assert data["members"] == 2
+    assert data["identities"] == [[["year", "2040"]], [["year", "2045"]]]
+    summary = ComparisonSummary.from_findings(
+        [grouped, _finding(), _finding(FindingKind.COUNT_CHANGED)]
+    )
+    assert summary.counts["element_removed"] == 1
+    assert summary.elements == {"element_added": 1, "element_removed": 2}
+    assert summary.to_dict()["elements"] == {"element_added": 1, "element_removed": 2}

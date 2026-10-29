@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from gcamreader.structure.errors import StructureIndexError
 from gcamreader.structure.index import ROOT_PARENT_HASH, NodeRow, StructureIndex
@@ -38,6 +38,7 @@ from gcamreader.structure.model import (
     PairComparison,
     PathSegment,
     format_path,
+    summarize_identities,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,13 @@ logger = logging.getLogger(__name__)
 Pairs = tuple[tuple[str, str], ...]
 Variants = tuple[tuple[Pairs, int], ...]
 _MASK = 0xFFFFFFFF
+
+#: Added/removed elements with fewer descendants than this get a descendant
+#: count but no tag histogram. Measured on the dev databases: 534 k one-sided
+#: non-leaf elements, mostly technologies with ~5 descendants, cost 12 min of
+#: histogram queries; the threshold keeps the summaries for removed sectors and
+#: branches while making the phase negligible.
+HISTOGRAM_MIN_DESCENDANTS = 50
 
 
 @dataclass(frozen=True)
@@ -163,6 +171,9 @@ class _Walker:
         self.baseline = baseline
         self.candidate = candidate
         self.findings: list[Finding] = []
+        # (finding position, member position hashes needing a histogram)
+        self.pending_removed: list[tuple[int, list[bytes]]] = []
+        self.pending_added: list[tuple[int, list[bytes]]] = []
         self.positions = 0
         self.pruned = 0
 
@@ -174,16 +185,20 @@ class _Walker:
             left = _group(self.baseline.children(parent_hash))
             right = _group(self.candidate.children(parent_hash))
             descend: list[tuple[bytes, tuple[PathSegment, ...]]] = []
+            one_sided: dict[tuple[FindingKind, str], list[_Node]] = {}
             for key in sorted(set(left) | set(right)):
                 node_l = left.get(key)
                 node_r = right.get(key)
-                segments = (*ancestors, PathSegment(key[0], key[1]))
                 if node_r is None:
                     assert node_l is not None
-                    self._one_sided(FindingKind.ELEMENT_REMOVED, node_l, segments)
+                    one_sided.setdefault(
+                        (FindingKind.ELEMENT_REMOVED, key[0]), []
+                    ).append(node_l)
                     continue
                 if node_l is None:
-                    self._one_sided(FindingKind.ELEMENT_ADDED, node_r, segments)
+                    one_sided.setdefault(
+                        (FindingKind.ELEMENT_ADDED, key[0]), []
+                    ).append(node_r)
                     continue
                 if (
                     node_l.variants == node_r.variants
@@ -191,41 +206,102 @@ class _Walker:
                 ):
                     self.pruned += 1
                     continue
+                segments = (*ancestors, PathSegment(key[0], key[1]))
                 self._compare_node(node_l, node_r, segments)
                 if node_l.fingerprint != node_r.fingerprint:
                     path_hash = node_l.path_hash or node_r.path_hash
                     if path_hash is not None:
                         descend.append((path_hash, segments))
+            for kind, _tag in sorted(one_sided):
+                self._one_sided(kind, one_sided[(kind, _tag)], ancestors)
             stack.extend(reversed(descend))
 
     def _one_sided(
-        self, kind: FindingKind, node: _Node, segments: tuple[PathSegment, ...]
+        self, kind: FindingKind, nodes: list[_Node], ancestors: tuple[PathSegment, ...]
     ) -> None:
+        """Report siblings present on one side only; several share one finding."""
         removed = kind is FindingKind.ELEMENT_REMOVED
-        index = self.baseline if removed else self.candidate
-        descendants = node.subtree_size - node.count
-        tags: tuple[tuple[str, int], ...] = ()
-        if node.path_hash is not None and descendants:
-            tags = index.descendant_tag_counts(node.path_hash)
-        snapshot = node.snapshot()
-        occurrences = f"{node.count} occurrence(s), " if node.count != 1 else ""
+        tag = nodes[0].tag
+        count = sum(node.count for node in nodes)
+        subtree_size = sum(node.subtree_size for node in nodes)
+        descendants = subtree_size - count
+        seeds = [
+            node.path_hash
+            for node in nodes
+            if node.path_hash is not None
+            and node.subtree_size - node.count >= HISTOGRAM_MIN_DESCENDANTS
+        ]
+        if seeds:
+            # Histograms are filled in afterwards, in batches (see fill_histograms).
+            pending = self.pending_removed if removed else self.pending_added
+            pending.append((len(self.findings), seeds))
+        verb = "Removed" if removed else "Added"
+        if len(nodes) == 1:
+            node = nodes[0]
+            segments = (*ancestors, PathSegment(tag, node.identity))
+            path = format_path(segments)
+            identity = node.identity
+            snapshot = node.snapshot()
+            occurrences = f"{count} occurrence(s), " if count != 1 else ""
+            detail = f"{verb}: {occurrences}{descendants} descendant element(s)"
+        else:
+            identities = tuple(node.identity for node in nodes)
+            segments = (*ancestors, PathSegment(tag, ()))
+            summary = f"{tag}[{summarize_identities(identities)}]"
+            path = f"{format_path(ancestors)} > {summary}" if ancestors else summary
+            identity = ()
+            snapshot = NodeSnapshot(
+                count=count, metadata=None, subtree_size=subtree_size, variants=()
+            )
+            listed = ", ".join(
+                PathSegment(tag, node.identity).format() for node in nodes
+            )
+            detail = (
+                f"{verb} {len(nodes)} <{tag}> elements ({count} occurrence(s), "
+                f"{descendants} descendant element(s)): {listed}"
+            )
         self.findings.append(
             Finding(
                 kind=kind,
-                path=format_path(segments),
+                path=path,
                 segments=segments,
-                tag=node.tag,
-                identity=node.identity,
+                tag=tag,
+                identity=identity,
+                identities=tuple(node.identity for node in nodes),
+                members=len(nodes),
                 baseline=snapshot if removed else None,
                 candidate=None if removed else snapshot,
                 descendant_count=descendants,
-                descendant_tags=tags,
-                detail=(
-                    f"{'Removed' if removed else 'Added'}: {occurrences}"
-                    f"{descendants} descendant element(s)"
-                ),
+                detail=detail,
             )
         )
+
+    def fill_histograms(self) -> None:
+        """Attach descendant tag histograms to one-sided findings, batched.
+
+        Only members with at least :data:`HISTOGRAM_MIN_DESCENDANTS`
+        descendants are summarised; a grouped finding's histogram is the sum
+        over its qualifying members.
+        """
+        for index, pending in (
+            (self.baseline, self.pending_removed),
+            (self.candidate, self.pending_added),
+        ):
+            if not pending:
+                continue
+            histograms = index.descendant_tag_counts_many(
+                [h for _, seeds in pending for h in seeds]
+            )
+            for position, seeds in pending:
+                merged: dict[str, int] = {}
+                for seed in seeds:
+                    for tag, count in histograms[seed]:
+                        merged[tag] = merged.get(tag, 0) + count
+                self.findings[position] = replace(
+                    self.findings[position],
+                    descendant_tags=tuple(sorted(merged.items())),
+                )
+            pending.clear()
 
     def _compare_node(
         self, node_l: _Node, node_r: _Node, segments: tuple[PathSegment, ...]
@@ -327,6 +403,7 @@ def compare_indexes(
     check_compatible(baseline, candidate)
     walker = _Walker(baseline, candidate)
     walker.run()
+    walker.fill_histograms()
     logger.debug(
         "Compared %s with %s: %d positions visited, %d identical subtrees "
         "skipped, %d findings",
