@@ -76,6 +76,9 @@ gcamreader = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "benchmarks"]
+# Test modules import shared helpers as `tests.<module>`; put the repository
+# root on sys.path so the `pytest` console script resolves them like CI does.
+pythonpath = ["."]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
