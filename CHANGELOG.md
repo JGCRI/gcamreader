@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `gcamreader diff`: compares the *structure* of two or more local GCAM output
+  databases (regions, sectors, technologies, inputs, years and other elements
+  and their metadata attributes, ignoring numeric values) and writes a Markdown
+  report with a matrix across inputs, an appendix for long lists and an optional
+  JSON result. Exit code 0 means identical structure, 1 differences, 2 error.
+- `gcamreader scenarios`: lists the runs stored in local output databases.
+- Python API: `compare_databases`, `list_scenarios`, `render_markdown`,
+  `ComparisonRules`, `ComparisonResult`, `Finding`, `ScenarioRef` and
+  `StructureError`, implemented in the new `gcamreader.structure` subpackage.
+- Java runtime discovery for the new commands: `GCAMREADER_JAVA`, then
+  `JAVA_HOME`, then `PATH`, with a version check (Java 8 or newer) and one-line
+  messages for common JVM and BaseX failures. The existing `local` and `remote`
+  commands are unchanged.
+
 ## [1.5.0] - 2026-06-15
 
 This release modernizes the package without changing its computational results.

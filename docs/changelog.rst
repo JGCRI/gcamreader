@@ -16,7 +16,26 @@ should add their own ``Release verification`` block following the pattern shown 
 Unreleased
 ----------
 
-No unreleased changes yet.
+Added
+~~~~~
+
+- ``gcamreader diff``: compares the *structure* of two or more local GCAM output
+  databases (regions, sectors, technologies, inputs, years and other elements
+  and their metadata attributes, ignoring numeric values) and writes a Markdown
+  report with a matrix across inputs, an appendix for long lists and an optional
+  JSON result. Exit code 0 means identical structure, 1 differences, 2 error.
+  See :doc:`structure_comparison`.
+- ``gcamreader scenarios``: lists the runs stored in local output databases.
+- Python API: :func:`gcamreader.compare_databases`,
+  :func:`gcamreader.list_scenarios`, :func:`gcamreader.render_markdown`,
+  :class:`gcamreader.ComparisonRules`, :class:`gcamreader.ComparisonResult`,
+  :class:`gcamreader.Finding`, :class:`gcamreader.ScenarioRef` and
+  :class:`gcamreader.StructureError`, implemented in the new
+  ``gcamreader.structure`` subpackage.
+- Java runtime discovery for the new commands: ``GCAMREADER_JAVA``, then
+  ``JAVA_HOME``, then ``PATH``, with a version check (Java 8 or newer) and
+  one-line messages for common JVM and BaseX failures. The existing ``local``
+  and ``remote`` commands are unchanged.
 
 .. _changelog-1-5-0:
 

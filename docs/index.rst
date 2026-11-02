@@ -23,6 +23,7 @@ Contents
    installation
    usage
    cli
+   structure_comparison
    verified_versions
    api
    contributing

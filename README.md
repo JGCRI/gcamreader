@@ -26,6 +26,10 @@ produced by [GCAM](https://github.com/JGCRI/gcam-core).
 - A Java runtime (JRE). `gcamreader` runs queries against local databases using
   a bundled copy of the GCAM ModelInterface, which requires Java. Remote queries
   use the BaseX REST API and also rely on a server running ModelInterface.
+  Java 8 or newer works (the bundled jars are Java 8 class files); the project
+  is tested with Temurin 17. The structural comparison commands look for Java
+  in `GCAMREADER_JAVA`, then `JAVA_HOME`, then `PATH`, so a user-space JRE can
+  be used where Java cannot be installed system-wide. No JRE is bundled.
 
 ## Installation
 
@@ -154,6 +158,41 @@ gcamreader remote \
 
 Use `gcamreader --help`, `gcamreader local --help`, or
 `gcamreader remote --help` for the full list of options.
+
+## Comparing database structure
+
+`gcamreader diff` compares the *structure* of two or more local output
+databases: which regions, sectors, technologies, inputs, years and other
+elements exist and which metadata attributes they carry. Numeric values are
+ignored. The result is a Markdown report (with a matrix across inputs and an
+appendix for long lists) and optionally a JSON file.
+
+```bash
+# Which runs does each database hold? Only needed when a database has several.
+gcamreader scenarios output/database_basexdb_ref output/database_basexdb_policy
+
+# Compare; keep the structure indexes so later comparisons are fast.
+gcamreader diff output/database_basexdb_ref output/database_basexdb_policy \
+    -o report.md --json result.json --work-dir ~/.cache/gcamreader-structure
+echo $?   # 0: identical structure, 1: differences found, 2: error
+```
+
+```python
+import gcamreader
+
+result = gcamreader.compare_databases(
+    ["output/database_basexdb_ref", "output/database_basexdb_policy"]
+)
+print(result.has_differences)
+for finding in result.comparisons[0].findings:
+    print(finding.kind.value, finding.path)
+report = gcamreader.render_markdown(result)
+```
+
+Only local databases are supported. See the
+[documentation](https://jgcri.github.io/gcamreader/structure_comparison.html)
+for the comparison rules, counting definitions, report layout, performance and
+limitations.
 
 ## Documentation
 
