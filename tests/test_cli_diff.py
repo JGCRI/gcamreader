@@ -28,6 +28,19 @@ from tests.test_structure_api import BASE, UNIT_CHANGED, FakeBackend
 
 runner = CliRunner()
 
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+def _plain(text: str) -> str:
+    """Return Typer help or usage-error output as one line of plain text.
+
+    Typer renders these with Rich, which forces colour when ``GITHUB_ACTIONS``
+    (or ``FORCE_COLOR``) is set and wraps the text in boxes. Drop escape codes
+    and box characters and collapse whitespace so substring checks hold both
+    locally and in CI.
+    """
+    return " ".join(re.sub(r"[─-╿]", " ", _ANSI.sub("", text)).split())
+
 
 def make_db(path: Path) -> str:
     path.mkdir(parents=True, exist_ok=True)
@@ -95,15 +108,14 @@ def fake_compare(monkeypatch: pytest.MonkeyPatch, results):
 def test_help_lists_new_commands() -> None:
     result = runner.invoke(cli.app, ["--help"])
     assert result.exit_code == 0
-    assert "diff" in result.stdout and "scenarios" in result.stdout
-    assert "local" in result.stdout and "remote" in result.stdout
+    assert "diff" in _plain(result.stdout) and "scenarios" in _plain(result.stdout)
+    assert "local" in _plain(result.stdout) and "remote" in _plain(result.stdout)
 
 
 def test_diff_help_mentions_exit_codes_and_local_only() -> None:
     result = runner.invoke(cli.app, ["diff", "--help"])
     assert result.exit_code == 0
-    # Rich wraps help text inside a box: drop box characters, collapse whitespace.
-    text = " ".join(re.sub(r"[─-╿]", " ", result.stdout).split())
+    text = _plain(result.stdout)
     assert "0: no structural differences; 1: differences found; 2: any error" in text
     assert "Remote databases are not supported" in text
     for option in (
@@ -120,7 +132,7 @@ def test_diff_help_mentions_exit_codes_and_local_only() -> None:
 def test_fewer_than_two_databases(dbs: list[str], fake_compare: FakeCompare) -> None:
     result = runner.invoke(cli.app, ["diff", dbs[0]])
     assert result.exit_code == 2
-    assert "at least 2 database directories" in result.output
+    assert "at least 2 database directories" in _plain(result.output)
     assert fake_compare.calls == []
 
 
@@ -131,7 +143,7 @@ def test_directory_without_basex_files(
     empty.mkdir()
     result = runner.invoke(cli.app, ["diff", dbs[0], str(empty)])
     assert result.exit_code == 2
-    assert "does not look like a BaseX database" in result.output
+    assert "does not look like a BaseX database" in _plain(result.output)
     assert fake_compare.calls == []
 
 
@@ -140,7 +152,7 @@ def test_missing_directory(
 ) -> None:
     result = runner.invoke(cli.app, ["diff", dbs[0], str(tmp_path / "nope")])
     assert result.exit_code == 2
-    assert "not a directory" in result.output
+    assert "not a directory" in _plain(result.output)
     assert fake_compare.calls == []
 
 
@@ -148,17 +160,17 @@ def test_missing_directory(
 def test_bad_baseline(dbs: list[str], fake_compare: FakeCompare, value: str) -> None:
     result = runner.invoke(cli.app, ["diff", *dbs, "--baseline", value])
     assert result.exit_code == 2
-    assert "--baseline" in result.output
+    assert "--baseline" in _plain(result.output)
     assert fake_compare.calls == []
 
 
 def test_bad_scenario_prefix(dbs: list[str], fake_compare: FakeCompare) -> None:
     result = runner.invoke(cli.app, ["diff", *dbs, "-s", "7=GCAM"])
     assert result.exit_code == 2
-    assert "out of range" in result.output
+    assert "out of range" in _plain(result.output)
     result = runner.invoke(cli.app, ["diff", *dbs, "-s", "A", "-s", "B"])
     assert result.exit_code == 2
-    assert "only one bare selector" in result.output
+    assert "only one bare selector" in _plain(result.output)
     assert fake_compare.calls == []
 
 
@@ -167,14 +179,14 @@ def test_bad_rules(dbs: list[str], tmp_path: Path, fake_compare: FakeCompare) ->
     bad.write_text('identity_attrs = ["name"]\n', encoding="utf-8")
     result = runner.invoke(cli.app, ["diff", *dbs, "--rules", str(bad)])
     assert result.exit_code == 2
-    assert "unknown key" in result.output
+    assert "unknown key" in _plain(result.output)
     result = runner.invoke(
         cli.app, ["diff", *dbs, "--rules", str(tmp_path / "missing.toml")]
     )
     assert result.exit_code == 2
     result = runner.invoke(cli.app, ["diff", *dbs, "--ignore-attr", "name"])
     assert result.exit_code == 2
-    assert "identity attributes" in result.output
+    assert "identity attributes" in _plain(result.output)
     assert fake_compare.calls == []
 
 
